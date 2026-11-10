@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           data: foundSample.data,
+          displayImageUrl: foundSample.imageUrl,
           processingTimeMs: elapsed,
           isSimulated: false,
           notes: 'Loaded benchmark sample dataset for Sri Lankan counter verification',
@@ -61,15 +62,39 @@ export async function POST(req: NextRequest) {
     }
 
     // Strip data url prefix if present
-    const cleanBase64 = imageBase64.includes(',')
+    let cleanBase64 = imageBase64.includes(',')
       ? imageBase64.split(',')[1]
       : imageBase64;
+    let effectiveMimeType = mimeType;
+    let displayImageUrl = imageBase64;
+
+    // Convert HEIC/HEIF files (iPhone photos) to JPEG for broad browser display
+    try {
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const isHeic =
+        effectiveMimeType?.includes('heic') ||
+        effectiveMimeType?.includes('heif') ||
+        (buffer.length > 12 && buffer.subarray(4, 12).toString('ascii').includes('ftyp'));
+
+      if (isHeic) {
+        const heicConvert = require('heic-convert');
+        const jpegBuffer = await heicConvert({
+          buffer,
+          format: 'JPEG',
+          quality: 0.85,
+        });
+        cleanBase64 = jpegBuffer.toString('base64');
+        effectiveMimeType = 'image/jpeg';
+        displayImageUrl = `data:image/jpeg;base64,${cleanBase64}`;
+      }
+    } catch (convErr) {
+      console.warn('Server HEIC conversion note:', convErr);
+    }
 
     const apiKey = userApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
       // Graceful offline/simulation mode when API key is not yet configured:
-      // Check if image data is one of our sample bills or synthesize a realistic Sri Lankan bill
       const elapsed = Date.now() - startTime;
       
       // Look for match in sample bills
@@ -92,6 +117,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         data: fallbackData,
+        displayImageUrl,
         processingTimeMs: Math.max(elapsed, 420),
         isSimulated: true,
         notice: 'Simulated preview mode active. To connect live Gemini 2.5 Flash, add your GEMINI_API_KEY in the top settings modal or .env.local file.',
@@ -110,7 +136,7 @@ export async function POST(req: NextRequest) {
           parts: [
             {
               inlineData: {
-                mimeType: mimeType || 'image/jpeg',
+                mimeType: effectiveMimeType || 'image/jpeg',
                 data: cleanBase64,
               },
             },
@@ -169,6 +195,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: validated.success ? validated.data : parsedJson,
+      displayImageUrl,
       processingTimeMs: elapsed,
       isSimulated: false,
     });

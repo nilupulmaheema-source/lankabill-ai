@@ -56,8 +56,17 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
   };
 
   const processImageFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please select a valid image file (JPEG, PNG, WebP).');
+    const fileName = file.name?.toLowerCase() || '';
+    const fileType = file.type?.toLowerCase() || '';
+    const isSupported =
+      fileType.startsWith('image/') ||
+      fileName.endsWith('.heic') ||
+      fileName.endsWith('.heif') ||
+      fileName.endsWith('.pdf') ||
+      fileType === 'application/pdf';
+
+    if (!isSupported) {
+      setErrorMsg('Please select a valid bill photo (JPEG, PNG, HEIC from iPhone, WebP) or PDF.');
       return;
     }
 
@@ -66,8 +75,8 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
     startTimer();
 
     try {
-      // 1. Client-side compression for fast 4G upload
-      setLoadingStep('Compressing photo for high-speed 4G upload...');
+      // 1. Client-side compression & format handling (with HEIC support)
+      setLoadingStep('Optimizing photo for high-speed upload...');
       const compResult = await compressInvoiceImage(file, 1600, 0.85);
       setCompressionInfo(compResult);
 
@@ -94,9 +103,12 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       setLoadingStep('Structuring itemized inventory & arithmetic check...');
       stopTimer();
 
+      // Use server-converted JPEG display URL if available (ensures iPhone HEIC photos render in all browsers)
+      const finalImageUrl = json.displayImageUrl || compResult.base64Data;
+
       onExtractionComplete({
         extraction: json.data,
-        imageUrl: compResult.base64Data,
+        imageUrl: finalImageUrl,
         processingTimeMs: json.processingTimeMs || Math.round(loadingTimer * 1000),
         compressionStats: compResult,
       });
@@ -243,7 +255,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif,application/pdf"
               capture="environment"
               className="hidden"
               onChange={(e) => {
@@ -291,7 +303,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             <input
               ref={desktopInputRef}
               type="file"
-              accept="image/*,application/pdf"
+              accept="image/*,.heic,.heif,application/pdf"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
@@ -307,7 +319,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
                 Or drag &amp; drop an invoice photo / receipt from computer
               </p>
               <p className="text-xs text-slate-500">
-                Automatic client-side compression (max 1600px, 0.85 JPEG) for ultra-fast upload
+                Supports iPhone camera (HEIC), JPEG, PNG, WebP, and PDF with automatic optimization
               </p>
             </div>
           </div>
