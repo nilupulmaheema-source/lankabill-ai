@@ -75,11 +75,26 @@ export default function Home() {
   useEffect(() => {
     refreshRecords();
 
-    // Register PWA Service Worker
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .catch((err) => console.log('SW registration note:', err));
+    // Clear stale caches and register PWA Service Worker with auto-update
+    if (typeof window !== 'undefined') {
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => {
+            if (name === 'lankabill-cache-v1') {
+              caches.delete(name);
+            }
+          });
+        });
+      }
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/sw.js')
+          .then((reg) => {
+            reg.update();
+          })
+          .catch((err) => console.log('SW registration note:', err));
+      }
     }
   }, []);
 

@@ -11,21 +11,40 @@ export interface CompressionResult {
 }
 
 /**
- * Checks if a file is Apple HEIC / HEIF format
+ * Checks if a file or blob is an Apple HEIC/HEIF file by examining
+ * its magic bytes (header bytes 4-16 contains 'ftyp' and 'heic' or 'mif1').
+ * This correctly catches iPhone files even if they were renamed to .jpg or .png!
  */
-export function isHeicFile(file: File | Blob): boolean {
+export async function checkIsHeicByBytes(file: File | Blob): Promise<boolean> {
   const name = (file as File).name?.toLowerCase() || '';
   const type = file.type?.toLowerCase() || '';
-  return (
+
+  if (
     name.endsWith('.heic') ||
     name.endsWith('.heif') ||
     type === 'image/heic' ||
     type === 'image/heif'
-  );
+  ) {
+    return true;
+  }
+
+  // Inspect first 32 bytes for ISO Media / HEIF box header 'ftypheic', 'ftypmif1', etc.
+  try {
+    const slice = file.slice(0, 32);
+    const buffer = await slice.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let str = '';
+    for (let i = 0; i < bytes.length; i++) {
+      str += String.fromCharCode(bytes[i]);
+    }
+    return str.includes('ftyp') && (str.includes('heic') || str.includes('heix') || str.includes('mif1') || str.includes('msf1'));
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Checks if a file is PDF
+ * Checks if a file is a PDF
  */
 export function isPdfFile(file: File | Blob): boolean {
   const name = (file as File).name?.toLowerCase() || '';
@@ -46,10 +65,11 @@ export function fileToBase64(file: File | Blob): Promise<string> {
 }
 
 /**
- * Compresses an image file on the client side:
- * - Handles HEIC/HEIF photos (iPhone camera) using client-side conversion or graceful server passthrough.
- * - Handles standard JPEG/PNG/WebP by resizing to maxDimension and compressing to JPEG quality.
- * - If browser fails to decode (e.g. HEIC in desktop Chrome), safely falls back to raw base64 so server can decode it!
+ * Robust invoice image optimizer:
+ * 1. Accurately detects iPhone HEIC/HEIF images even when renamed to .jpg!
+ * 2. If it's HEIC or PDF, bypasses HTML5 Image decoding and passes raw data directly
+ *    to the server's native heic-convert and Gemini 2.5 Flash pipeline.
+ * 3. Never throws "Failed to decode image data" — gracefully falls back to raw data.
  */
 export async function compressInvoiceImage(
   file: File | Blob,
@@ -59,7 +79,7 @@ export async function compressInvoiceImage(
   const startTime = performance.now();
   const originalSizeBytes = file.size;
 
-  // 1. If it's a PDF, we bypass image canvas compression and send base64 directly
+  // 1. PDF Handling: send directly to Gemini
   if (isPdfFile(file)) {
     const base64Data = await fileToBase64(file);
     const pureBase64 = base64Data.split(',')[1] || '';
@@ -75,53 +95,67 @@ export async function compressInvoiceImage(
     };
   }
 
-  // 2. If it's an iPhone HEIC/HEIF file, try client conversion via heic2any
-  let targetFile: File | Blob = file;
-  let isConverted = false;
+  // 2. Magic-byte inspection for HEIC/HEIF (handles renamed iPhone photos like IMG_9427.jpg)
+  const isHeic = await checkIsHeicByBytes(file);
 
-  if (isHeicFile(file) && typeof window !== 'undefined') {
+  if (isHeic) {
+    // If running in browser and heic2any is feasible, try it; otherwise pass directly to server heic-convert
     try {
-      // Dynamic import of heic2any for client side
-      const heic2any = (await import('heic2any')).default;
-      const convertedBlob = await heic2any({
-        blob: file,
-        toType: 'image/jpeg',
-        quality: quality,
-      });
+      if (typeof window !== 'undefined') {
+        const heic2any = (await import('heic2any')).default;
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: quality,
+        });
 
-      targetFile = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-      isConverted = true;
-    } catch (heicErr) {
-      console.warn('Client heic2any conversion skipped or failed, passing raw HEIC to server:', heicErr);
-      // Fallback: Read raw HEIC into base64 and let the server's heic-convert handle it!
-      const rawBase64Data = await fileToBase64(file);
-      const pureBase64 = rawBase64Data.split(',')[1] || '';
-      return {
-        base64Data: rawBase64Data,
-        pureBase64,
-        mimeType: 'image/heic',
-        originalSizeBytes,
-        compressedSizeBytes: Math.round((pureBase64.length * 3) / 4),
-        width: 1200,
-        height: 1600,
-        durationMs: Math.round(performance.now() - startTime),
-        isConvertedFromHeic: true,
-      };
+        const targetBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+        const base64Data = await fileToBase64(targetBlob);
+        const pureBase64 = base64Data.split(',')[1] || '';
+
+        return {
+          base64Data,
+          pureBase64,
+          mimeType: 'image/jpeg',
+          originalSizeBytes,
+          compressedSizeBytes: Math.round((pureBase64.length * 3) / 4),
+          width: 1200,
+          height: 1600,
+          durationMs: Math.round(performance.now() - startTime),
+          isConvertedFromHeic: true,
+        };
+      }
+    } catch (clientErr) {
+      console.warn('Client HEIC conversion deferred to server:', clientErr);
     }
+
+    // Direct passthrough to server heic-convert
+    const rawBase64Data = await fileToBase64(file);
+    const pureBase64 = rawBase64Data.split(',')[1] || '';
+    return {
+      base64Data: rawBase64Data,
+      pureBase64,
+      mimeType: 'image/heic',
+      originalSizeBytes,
+      compressedSizeBytes: Math.round((pureBase64.length * 3) / 4),
+      width: 1200,
+      height: 1600,
+      durationMs: Math.round(performance.now() - startTime),
+      isConvertedFromHeic: true,
+    };
   }
 
-  // 3. Downscale and compress standard images via Canvas
+  // 3. Standard image compression via Canvas
   return new Promise((resolve) => {
     const reader = new FileReader();
 
     reader.onerror = async () => {
-      // Fallback to raw base64 if FileReader failed
-      const raw = await fileToBase64(targetFile).catch(() => '');
+      const raw = await fileToBase64(file).catch(() => '');
       const pure = raw.split(',')[1] || '';
       resolve({
         base64Data: raw,
         pureBase64: pure,
-        mimeType: targetFile.type || 'image/jpeg',
+        mimeType: file.type || 'image/jpeg',
         originalSizeBytes,
         compressedSizeBytes: Math.round((pure.length * 3) / 4),
         width: 0,
@@ -133,21 +167,21 @@ export async function compressInvoiceImage(
     reader.onload = (e) => {
       const img = new Image();
 
-      // Graceful fallback if browser fails to decode the image format (e.g. Chrome encountering HEIC)
-      img.onerror = async () => {
-        console.warn('Browser could not decode image with new Image(), falling back to raw base64.');
+      // IF HTML5 IMAGE DECODER EVER FAILS: Never reject with an error!
+      // Fallback gracefully to raw base64 and let the server process it!
+      img.onerror = () => {
+        console.warn('Browser new Image() decoder failed. Passing raw base64 directly to server.');
         const raw = (e.target?.result as string) || '';
         const pure = raw.split(',')[1] || '';
         resolve({
           base64Data: raw,
           pureBase64: pure,
-          mimeType: targetFile.type || (isHeicFile(file) ? 'image/heic' : 'image/jpeg'),
+          mimeType: file.type || 'image/jpeg',
           originalSizeBytes,
           compressedSizeBytes: Math.round((pure.length * 3) / 4),
           width: 0,
           height: 0,
           durationMs: Math.round(performance.now() - startTime),
-          isConvertedFromHeic: isHeicFile(file),
         });
       };
 
@@ -155,7 +189,6 @@ export async function compressInvoiceImage(
         let width = img.naturalWidth || img.width;
         let height = img.naturalHeight || img.height;
 
-        // Calculate aspect-ratio preserved downscaling
         if (width > maxDimension || height > maxDimension) {
           if (width > height) {
             height = Math.round((height * maxDimension) / width);
@@ -187,7 +220,6 @@ export async function compressInvoiceImage(
           return;
         }
 
-        // Draw image with smooth scaling
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
@@ -196,19 +228,15 @@ export async function compressInvoiceImage(
         const base64Data = canvas.toDataURL(mimeType, quality);
         const pureBase64 = base64Data.split(',')[1] || '';
 
-        const compressedSizeBytes = Math.round((pureBase64.length * 3) / 4);
-        const durationMs = Math.round(performance.now() - startTime);
-
         resolve({
           base64Data,
           pureBase64,
           mimeType,
           originalSizeBytes,
-          compressedSizeBytes,
+          compressedSizeBytes: Math.round((pureBase64.length * 3) / 4),
           width,
           height,
-          durationMs,
-          isConvertedFromHeic: isConverted,
+          durationMs: Math.round(performance.now() - startTime),
         });
       };
 
@@ -219,7 +247,7 @@ export async function compressInvoiceImage(
       }
     };
 
-    reader.readAsDataURL(targetFile);
+    reader.readAsDataURL(file);
   });
 }
 

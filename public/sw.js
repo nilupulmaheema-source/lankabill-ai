@@ -1,13 +1,7 @@
-// LankaBill AI Service Worker for offline PWA caching
-const CACHE_NAME = 'lankabill-cache-v1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/icon.svg'];
+// LankaBill AI Service Worker - Network-First Strategy for Instant Updates
+const CACHE_NAME = 'lankabill-cache-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -15,30 +9,36 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => caches.delete(key)) // clear all old caches
       );
     })
   );
   self.clients.claim();
 });
 
+// Network first, falling back to cache if offline
 self.addEventListener('fetch', (event) => {
-  // Pass API requests through directly to network
+  // Never intercept API calls
   if (event.request.url.includes('/api/')) {
     return;
   }
 
+  // Network first
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).catch(() => {
-          // If offline and requesting root, return cached root
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-        })
-      );
-    })
+    fetch(event.request)
+      .then((response) => {
+        // Clone response and update cache
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache if network fails (offline)
+        return caches.match(event.request);
+      })
   );
 });
