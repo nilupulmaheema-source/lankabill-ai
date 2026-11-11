@@ -27,6 +27,7 @@ import {
   InvoiceCategory,
   InvoiceCategoryValues,
   InvoiceStatus,
+  CATEGORY_CONFIG,
 } from '@/types/invoice';
 import {
   exportInvoicesToCsv,
@@ -287,11 +288,7 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
                     <td className="py-3 px-3">
                       <span
                         className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          inv.category === 'Pharmacy'
-                            ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
-                            : inv.category === 'Hardware'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-slate-800 text-slate-300'
+                          CATEGORY_CONFIG[inv.category]?.badgeClass || 'bg-slate-800 text-slate-300'
                         }`}
                       >
                         {inv.category}

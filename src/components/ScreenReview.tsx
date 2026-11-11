@@ -27,6 +27,8 @@ import {
   InvoiceCategory,
   InvoiceCategoryValues,
   InvoiceRecord,
+  checkArithmeticIntegrity,
+  CATEGORY_CONFIG,
 } from '@/types/invoice';
 
 interface ScreenReviewProps {
@@ -70,24 +72,14 @@ export function ScreenReview({
   const [mobileView, setMobileView] = useState<'split' | 'photo' | 'form'>('split');
   const [isSaving, setIsSaving] = useState(false);
 
-  // ARITHMETIC INTEGRITY CHECK
-  const calculatedTotal = useMemo(() => {
-    return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  }, [items]);
-
-  const rawSumOfProducts = useMemo(() => {
-    return items.reduce(
-      (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-      0
-    );
-  }, [items]);
-
-  // Discrepancy comparison: Calculated Total vs Grand Total on bill
-  const discrepancy = useMemo(() => {
-    return Math.abs(calculatedTotal - Number(grandTotalInput || 0));
-  }, [calculatedTotal, grandTotalInput]);
-
-  const hasDiscrepancy = discrepancy > 1.0;
+  // Arithmetic Integrity Check (Discriminated Union pattern)
+  const integrity = useMemo(
+    () => checkArithmeticIntegrity(items, grandTotalInput),
+    [items, grandTotalInput]
+  );
+  const calculatedTotal = integrity.calculatedTotal;
+  const hasDiscrepancy = integrity.status === 'discrepancy';
+  const discrepancy = integrity.status === 'discrepancy' ? integrity.diff : 0;
 
   // Update item field
   const handleItemChange = (id: string, field: keyof InvoiceItem, value: any) => {
