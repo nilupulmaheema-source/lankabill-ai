@@ -80,12 +80,12 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       const compResult = await compressInvoiceImage(file, 1600, 0.85);
       setCompressionInfo(compResult);
 
-      // 2. Call Gemini Vision API Route with 35s timeout
+      // 2. Call Gemini Vision API Route with 60s timeout (accommodates cold start & API retries)
       setLoadingStep('Reading bill with Gemini Flash...');
       const userSettings = getUserSettings();
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       try {
         const response = await fetch('/api/extract', {
@@ -125,7 +125,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       const isTimeout = err.name === 'AbortError';
       setErrorMsg(
         isTimeout
-          ? 'Scanning timed out after 35s. Please try again.'
+          ? 'Scanning timed out after 60s. Please check your network or try again.'
           : (err.message || 'Error processing bill photo. Please try again.')
       );
     } finally {
