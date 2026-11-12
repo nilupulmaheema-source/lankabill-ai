@@ -129,13 +129,13 @@ export async function POST(req: NextRequest) {
     // Initialize Google Gen AI SDK (@google/genai)
     const ai = new GoogleGenAI({ apiKey });
 
-    // Candidate vision models with gemini-3.8-flash as primary
+    // Candidate vision models with gemini-3.8-flash as primary and gemini-3.1-pro-preview as active fallback
     const candidateModels = [
       'gemini-3.8-flash',
-      'gemini-3.8-pro',
-      'gemini-2.5-pro',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-pro-latest',
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-pro',
+      'gemini-3.8-flash-preview',
+      'gemini-2.0-flash-exp',
     ];
 
     let lastError: any = null;
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
     ];
 
     // Retry helper with backoff for temporary 503 (high demand spikes)
-    async function attemptModelWithRetry(modelName: string, maxRetries = 2): Promise<any> {
+    async function attemptModelWithRetry(modelName: string, maxRetries = 1): Promise<any> {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const res = await ai.models.generateContent({
@@ -211,8 +211,8 @@ export async function POST(req: NextRequest) {
           const is503 = errMsg.includes('503') || err?.status === 503 || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
           
           if (is503 && attempt < maxRetries) {
-            console.log(`[LankaBill API] Model ${modelName} 503 high demand spike. Auto-retrying in 1.2s (${attempt + 1}/${maxRetries})...`);
-            await new Promise((r) => setTimeout(r, 1200));
+            console.log(`[LankaBill API] Model ${modelName} 503 high demand spike. Retrying in 800ms (${attempt + 1}/${maxRetries})...`);
+            await new Promise((r) => setTimeout(r, 800));
             continue;
           }
           throw err;
@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
 
     for (const model of candidateModels) {
       try {
-        response = await attemptModelWithRetry(model, 2);
+        response = await attemptModelWithRetry(model, 1);
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;
@@ -258,10 +258,16 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error in /api/extract:', error);
     const elapsed = Date.now() - startTime;
+    const rawMsg = error.message || 'Failed to extract invoice data using Gemini Vision.';
+    const is503 = rawMsg.includes('503') || rawMsg.includes('high demand') || rawMsg.includes('UNAVAILABLE');
+    const userFriendlyMsg = is503
+      ? 'Google Gemini Vision free-tier is currently experiencing temporary high demand (503). Please wait 5-10 seconds and try again.'
+      : rawMsg;
+
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to extract invoice data using Gemini Vision.',
+        error: userFriendlyMsg,
         processingTimeMs: elapsed,
       },
       { status: 500 }
