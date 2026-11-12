@@ -161,7 +161,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE invoices;`;
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  Google Gemini API Key (`gemini-2.5-flash`)
+                  Google Gemini API Key (Gemini Flash Vision)
                 </label>
                 <input
                   type="password"

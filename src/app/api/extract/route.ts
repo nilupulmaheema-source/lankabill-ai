@@ -129,63 +129,92 @@ export async function POST(req: NextRequest) {
     // Initialize Google Gen AI SDK (@google/genai)
     const ai = new GoogleGenAI({ apiKey });
 
-    // Call gemini-2.5-flash with structured output schema
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                mimeType: effectiveMimeType || 'image/jpeg',
-                data: cleanBase64,
-              },
-            },
-            {
-              text: 'Analyze this physical Sri Lankan invoice / chit photo. Extract all header fields and line items into strict JSON according to the schema.',
-            },
-          ],
-        },
-      ],
-      config: {
-        systemInstruction: SRI_LANKA_BILL_SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            vendor_name: { type: Type.STRING },
-            invoice_number: { type: Type.STRING },
-            invoice_date: { type: Type.STRING },
-            category: {
-              type: Type.STRING,
-              enum: ['Pharmacy', 'Hardware', 'General', 'Utilities'],
-            },
-            items: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  quantity: { type: Type.NUMBER },
-                  unit: { type: Type.STRING },
-                  unit_price: { type: Type.NUMBER },
-                  total: { type: Type.NUMBER },
-                  is_illegible: { type: Type.BOOLEAN },
-                },
-                required: ['name'],
-              },
-            },
-            subtotal: { type: Type.NUMBER },
-            discount: { type: Type.NUMBER },
-            tax: { type: Type.NUMBER },
-            grand_total: { type: Type.NUMBER },
-            confidence_notes: { type: Type.STRING },
+    // Candidate vision models with gemini-3.8-flash as primary
+    const candidateModels = [
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
+
+    let lastError: any = null;
+    let response: any = null;
+
+    const requestConfig = {
+      systemInstruction: SRI_LANKA_BILL_SYSTEM_PROMPT,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          vendor_name: { type: Type.STRING },
+          invoice_number: { type: Type.STRING },
+          invoice_date: { type: Type.STRING },
+          category: {
+            type: Type.STRING,
+            enum: ['Pharmacy', 'Hardware', 'General', 'Utilities'],
           },
-          required: ['items', 'grand_total'],
+          items: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                quantity: { type: Type.NUMBER },
+                unit: { type: Type.STRING },
+                unit_price: { type: Type.NUMBER },
+                total: { type: Type.NUMBER },
+                is_illegible: { type: Type.BOOLEAN },
+              },
+              required: ['name'],
+            },
+          },
+          subtotal: { type: Type.NUMBER },
+          discount: { type: Type.NUMBER },
+          tax: { type: Type.NUMBER },
+          grand_total: { type: Type.NUMBER },
+          confidence_notes: { type: Type.STRING },
         },
+        required: ['items', 'grand_total'],
       },
-    });
+    };
+
+    const requestContents = [
+      {
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: effectiveMimeType || 'image/jpeg',
+              data: cleanBase64,
+            },
+          },
+          {
+            text: 'Analyze this physical Sri Lankan invoice / chit photo. Extract all header fields and line items into strict JSON according to the schema.',
+          },
+        ],
+      },
+    ];
+
+    for (const model of candidateModels) {
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents: requestContents,
+          config: requestConfig,
+        });
+        if (response && response.text) {
+          console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[LankaBill API] Model attempt ${model} note:`, err.message || err);
+        lastError = err;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('All candidate Gemini models failed to process image.');
+    }
 
     const responseText = response.text?.trim() || '{}';
     let parsedJson = JSON.parse(responseText);

@@ -400,7 +400,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             </div>
             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 text-[11px] text-slate-300 col-span-2 sm:col-span-1">
               <Zap className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>Gemini 2.5 Flash Vision</span>
+              <span>Gemini Flash Vision</span>
             </div>
           </div>
         </div>
