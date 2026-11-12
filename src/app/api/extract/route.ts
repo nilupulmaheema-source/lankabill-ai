@@ -3,26 +3,28 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { InvoiceExtractionSchema } from '@/types/invoice';
 import { SAMPLE_BILLS } from '@/data/sampleBills';
 
-// System prompt tailored for Sri Lankan retail bills
+// System prompt tailored for Sri Lankan retail bills (Day 1 Benchmark & Calibration)
 const SRI_LANKA_BILL_SYSTEM_PROMPT = `
 You are an expert high-speed Optical Document & Invoice AI specializing in Sri Lankan retail and distribution bills.
 Your job is to accurately extract supplier invoices, Goods Received Notes (GRN), delivery notes, and counter cash chits from Sri Lankan merchants (pharmacies, hardware stores, grocery distributors, and building material yards).
 
 CRITICAL EXTRACTION GUIDELINES:
 1. Language & Script:
-   - Invoices frequently contain English, Sinhala Unicode (e.g., සිමෙන්ති, බට, ඇණ, තහඩු, කම්බි, තෙල්), or Singlish (e.g., weli cube, kambi 10mm, takaran, s-lon pvc, boralu, gala).
-   - Accurately preserve the exact item names in Sinhala or Singlish where written.
+   - Invoices frequently contain English, Sinhala Unicode (e.g., සිමෙන්ති, බට, ඇණ, තහඩු, කම්බි, තෙල්, වැලි), or Singlish (e.g., weli cube, kambi 10mm, takaran, s-lon pvc, boralu, gala).
+   - Accurately preserve the exact item names in Sinhala or Singlish where written. Never translate Sinhala item names to English if written in Sinhala.
 
-2. Packaging Units Normalization:
-   - Normalize Sri Lankan packaging and volume units to standard short forms:
-     "pkt" (packets), "nos" (numbers/pieces), "cube" (for sand/aggregate/soil), "kg" (kilograms), 
-     "bundle" (for steel/timber), "mtr" (meters), "roll" (for barbed wire/hoses), "box", "btl" (bottles), "tin", "bag" (for cement/flour).
+2. Packaging Units Normalization (Strict Canonical Standard):
+   - Normalize Sri Lankan packaging and volume units to standard lowercase short forms:
+     * Hardware: "cube" (for sand/soil/aggregate - කුබ්බ/ක්යුබ්), "bag" (for cement/lime), "bundle" (for tor steel/rebar - බන්ඩල්), "nos" (for pipes/fittings/pieces - ගෙඩි/කෑලි/pcs/numbers), "kg" (for nails/wire), "roll" (for barbed wire/chainlink), "sheet" (for asbestos/zinc takaran), "sqft" (for tiles/granite).
+     * Pharma & Medical: "pkt" (packets), "strip" (tablets/capsule strips), "box", "btl" (bottles), "tin", "tab" (individual tablets/පෙති), "cap" (capsules).
+     * General Retail: "kg", "g", "l", "ml", "mtr", "nos", "pkt".
 
-3. Numerical & Arithmetic Accuracy:
+3. Numerical & Arithmetic Accuracy & Anti-Hallucination:
    - Extract exact unit price (in LKR - Sri Lankan Rupees) and quantities.
    - If line total is printed, extract it as is.
+   - Extract subtotal, trade discount (if present, e.g. 5% pharma discount), and tax (VAT/SSCL) if printed.
    - Extract the printed Grand Total.
-   - If handwriting or numeric values are completely illegible or cut off, return null instead of hallucinating values.
+   - ANTI-HALLUCINATION GUARDRAIL: If handwriting or numeric values are torn off, smudged, cut off, or completely illegible, set quantity/unit_price/total to null and set is_illegible to true. NEVER fabricate or guess numbers.
 
 4. Category Classification:
    - Determine the most accurate category: "Pharmacy", "Hardware", "General", or "Utilities".
@@ -169,10 +171,14 @@ export async function POST(req: NextRequest) {
                   unit: { type: Type.STRING },
                   unit_price: { type: Type.NUMBER },
                   total: { type: Type.NUMBER },
+                  is_illegible: { type: Type.BOOLEAN },
                 },
-                required: ['name', 'quantity', 'unit_price', 'total'],
+                required: ['name'],
               },
             },
+            subtotal: { type: Type.NUMBER },
+            discount: { type: Type.NUMBER },
+            tax: { type: Type.NUMBER },
             grand_total: { type: Type.NUMBER },
             confidence_notes: { type: Type.STRING },
           },

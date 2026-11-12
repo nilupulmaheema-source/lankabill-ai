@@ -239,5 +239,118 @@ export const SAMPLE_BILLS: SampleBill[] = [
       grand_total: 48400.00,
       confidence_notes: 'Arithmetic discrepancy detected between line calculation (10 x 850 = 8500) and handwritten line total (10,000).'
     }
+  },
+  {
+    id: 'sample-torn-4',
+    title: 'Piliyandala Yard Chit [TORN PAPER / NULL GUARD]',
+    category: 'Hardware',
+    description: 'Damaged paper with a physically torn price on line 2. Tests zero-hallucination null guardrails.',
+    imageUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="850" viewBox="0 0 600 850" style="background:#fef2f2; font-family:sans-serif; color:#450a0a;">
+        <rect width="600" height="850" fill="#fef2f2"/>
+        <rect x="25" y="25" width="550" height="800" fill="none" stroke="#fca5a5" stroke-width="2"/>
+        <text x="300" y="70" font-size="22" font-weight="bold" text-anchor="middle" fill="#991b1b">PILIYANDALA BUILDING MATERIALS YARD</text>
+        <text x="300" y="95" font-size="12" text-anchor="middle" fill="#b91c1c">Bypass Road, Piliyandala | Tel: 011-2618991</text>
+        <line x1="45" y1="130" x2="555" y2="130" stroke="#ef4444" stroke-width="1"/>
+        <text x="45" y="160" font-size="13"><b>Chit No:</b> PBY-4402</text>
+        <text x="400" y="160" font-size="13"><b>Date:</b> 2026-11-07</text>
+        
+        <rect x="45" y="195" width="510" height="28" fill="#fee2e2"/>
+        <text x="55" y="213" font-size="11" font-weight="bold">ITEM</text>
+        <text x="320" y="213" font-size="11" font-weight="bold">QTY</text>
+        <text x="410" y="213" font-size="11" font-weight="bold">PRICE</text>
+        <text x="490" y="213" font-size="11" font-weight="bold">TOTAL</text>
+
+        <text x="55" y="250" font-size="12">1. River Sand Grade 1 (වැලි කියුබ්)</text>
+        <text x="320" y="250" font-size="12">3 cube</text>
+        <text x="410" y="250" font-size="12">19,000.00</text>
+        <text x="490" y="250" font-size="12">57,000.00</text>
+
+        <!-- Physically torn section illustration -->
+        <path d="M 45 280 Q 200 275 350 285 L 555 285 L 555 330 L 380 330 Q 300 340 45 330 Z" fill="#fee2e2" stroke="#dc2626" stroke-dasharray="4 4" opacity="0.6"/>
+        <text x="55" y="305" font-size="12">2. Metal 3/4" (ගල් කියුබ්)</text>
+        <text x="320" y="305" font-size="12">2 cube</text>
+        <text x="410" y="305" font-size="12" fill="#ef4444"><i>[TORN OFF]</i></text>
+        <text x="490" y="305" font-size="12" fill="#ef4444"><i>[ILLEGIBLE]</i></text>
+
+        <line x1="45" y1="360" x2="555" y2="360" stroke="#f87171" stroke-width="1"/>
+        <text x="300" y="400" font-size="14" font-weight="bold">PARTIAL VISIBLE TOTAL:</text>
+        <text x="540" y="400" font-size="15" font-weight="bold" fill="#991b1b" text-anchor="end">Rs. 89,000.00</text>
+      </svg>
+    `),
+    data: {
+      vendor_name: 'Piliyandala Building Materials Yard',
+      invoice_number: 'PBY-4402',
+      invoice_date: '2026-11-07',
+      category: 'Hardware',
+      items: [
+        { name: 'River Sand Grade 1 (වැලි කියුබ්)', quantity: 3, unit: 'cube', unit_price: 19000.00, total: 57000.00 },
+        { name: 'Metal 3/4" (ගල් කියුබ්)', quantity: 2, unit: 'cube', unit_price: null, total: null, is_illegible: true, isFlagged: true, flagReason: 'Torn paper: price and total torn off' },
+      ],
+      grand_total: 89000.00,
+      confidence_notes: 'Anti-hallucination guardrail active. Line 2 price torn on physical chit; returned null instead of guessing.'
+    }
+  },
+  {
+    id: 'sample-tax-discount-5',
+    title: 'Union Chemists & Super Care [DISCOUNT & TAX]',
+    category: 'Pharmacy',
+    description: 'Retail pharmacy invoice featuring 5% trade discount, subtotal, and SSCL/VAT breakdown.',
+    imageUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="850" viewBox="0 0 600 850" style="background:#ffffff; font-family:sans-serif; color:#1e293b;">
+        <rect width="600" height="850" fill="#ffffff"/>
+        <rect x="25" y="25" width="550" height="800" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="45" y="70" font-size="20" font-weight="bold" fill="#0369a1">UNION CHEMISTS (PVT) LTD</text>
+        <text x="45" y="92" font-size="12" fill="#64748b">Union Place, Colombo 02 | VAT Reg: 109283749-7000</text>
+        <line x1="45" y1="110" x2="555" y2="110" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="45" y="135" font-size="12"><b>Inv No:</b> UC-2026-9931</text>
+        <text x="400" y="135" font-size="12"><b>Date:</b> 2026-11-08</text>
+
+        <rect x="45" y="150" width="510" height="26" fill="#f0f9ff"/>
+        <text x="55" y="167" font-size="11" font-weight="bold" fill="#0369a1">DESCRIPTION</text>
+        <text x="320" y="167" font-size="11" font-weight="bold" fill="#0369a1">QTY</text>
+        <text x="410" y="167" font-size="11" font-weight="bold" fill="#0369a1">PRICE</text>
+        <text x="495" y="167" font-size="11" font-weight="bold" fill="#0369a1">TOTAL</text>
+
+        <text x="55" y="195" font-size="12">Augmentin 625mg (14s tab pack)</text>
+        <text x="320" y="195" font-size="12">4 pkt</text>
+        <text x="410" y="195" font-size="12">2,850.00</text>
+        <text x="495" y="195" font-size="12">11,400.00</text>
+
+        <text x="55" y="225" font-size="12">Surgical Face Masks 3-Ply</text>
+        <text x="320" y="225" font-size="12">5 box</text>
+        <text x="410" y="225" font-size="12">720.00</text>
+        <text x="495" y="225" font-size="12">3,600.00</text>
+
+        <line x1="45" y1="260" x2="555" y2="260" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="340" y="285" font-size="12">Subtotal:</text>
+        <text x="535" y="285" font-size="12" text-anchor="end">15,000.00</text>
+
+        <text x="340" y="310" font-size="12" fill="#059669">Trade Discount (5%):</text>
+        <text x="535" y="310" font-size="12" fill="#059669" text-anchor="end">-750.00</text>
+
+        <text x="340" y="335" font-size="12">SSCL / VAT:</text>
+        <text x="535" y="335" font-size="12" text-anchor="end">375.00</text>
+
+        <line x1="330" y1="345" x2="545" y2="345" stroke="#94a3b8" stroke-width="1"/>
+        <text x="340" y="370" font-size="14" font-weight="bold">NET TOTAL (LKR):</text>
+        <text x="535" y="370" font-size="15" font-weight="bold" fill="#0284c7" text-anchor="end">Rs. 14,625.00</text>
+      </svg>
+    `),
+    data: {
+      vendor_name: 'Union Chemists (Pvt) Ltd',
+      invoice_number: 'UC-2026-9931',
+      invoice_date: '2026-11-08',
+      category: 'Pharmacy',
+      items: [
+        { name: 'Augmentin 625mg (14s tab pack)', quantity: 4, unit: 'pkt', unit_price: 2850.00, total: 11400.00 },
+        { name: 'Surgical Face Masks 3-Ply', quantity: 5, unit: 'box', unit_price: 720.00, total: 3600.00 },
+      ],
+      subtotal: 15000.00,
+      discount: 750.00,
+      tax: 375.00,
+      grand_total: 14625.00,
+      confidence_notes: 'Extracted with subtotal (15,000), 5% trade discount (-750), and tax (375). Arithmetic perfectly verified.'
+    }
   }
 ];

@@ -454,13 +454,13 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
                       <tr key={idx} className="hover:bg-slate-800/30">
                         <td className="p-2.5 text-slate-100 font-medium">{it.name}</td>
                         <td className="p-2.5 text-center font-mono text-slate-300">
-                          {it.quantity} {it.unit || 'nos'}
+                          {it.quantity != null ? `${it.quantity} ${it.unit || 'nos'}` : <span className="text-amber-400 italic text-[11px]">Torn/Null</span>}
                         </td>
                         <td className="p-2.5 text-right font-mono text-slate-300">
-                          {it.unit_price.toFixed(2)}
+                          {it.unit_price != null ? it.unit_price.toFixed(2) : '-'}
                         </td>
                         <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
-                          {it.total.toFixed(2)}
+                          {it.total != null ? it.total.toFixed(2) : <span className="text-amber-400 text-xs">Unspecified</span>}
                         </td>
                       </tr>
                     ))}

@@ -58,6 +58,15 @@ export function ScreenReview({
   const [grandTotalInput, setGrandTotalInput] = useState<number>(
     initialData.grand_total || 0
   );
+  const [subtotalInput, setSubtotalInput] = useState<number | null>(
+    initialData.subtotal ?? null
+  );
+  const [discountInput, setDiscountInput] = useState<number | null>(
+    initialData.discount ?? null
+  );
+  const [taxInput, setTaxInput] = useState<number | null>(
+    initialData.tax ?? null
+  );
 
   // Line items state
   const [items, setItems] = useState<InvoiceItem[]>(
@@ -65,6 +74,9 @@ export function ScreenReview({
       ...it,
       id: it.id || `item-${Date.now()}-${idx}`,
       unit: it.unit || 'nos',
+      quantity: it.quantity ?? null,
+      unit_price: it.unit_price ?? null,
+      total: it.total ?? null,
     }))
   );
 
@@ -72,10 +84,16 @@ export function ScreenReview({
   const [mobileView, setMobileView] = useState<'split' | 'photo' | 'form'>('split');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Arithmetic Integrity Check (Discriminated Union pattern)
+  // Arithmetic Integrity Check (Discriminated Union pattern with Day 1 Calibrated Tolerance)
   const integrity = useMemo(
-    () => checkArithmeticIntegrity(items, grandTotalInput),
-    [items, grandTotalInput]
+    () =>
+      checkArithmeticIntegrity(items, grandTotalInput, {
+        subtotal: subtotalInput,
+        discount: discountInput,
+        tax: taxInput,
+        tolerance: 1.0,
+      }),
+    [items, grandTotalInput, subtotalInput, discountInput, taxInput]
   );
   const calculatedTotal = integrity.calculatedTotal;
   const hasDiscrepancy = integrity.status === 'discrepancy';
@@ -91,19 +109,27 @@ export function ScreenReview({
 
         // Auto-recalculate line total if quantity or unit_price was modified
         if (field === 'quantity' || field === 'unit_price') {
-          const qty = field === 'quantity' ? Number(value) || 0 : item.quantity;
-          const price = field === 'unit_price' ? Number(value) || 0 : item.unit_price;
-          updated.total = Math.round(qty * price * 100) / 100;
+          const qty = field === 'quantity' ? (value === '' || value === null ? null : Number(value)) : item.quantity;
+          const price = field === 'unit_price' ? (value === '' || value === null ? null : Number(value)) : item.unit_price;
+          if (qty != null && price != null) {
+            updated.total = Math.round(qty * price * 100) / 100;
+            updated.is_illegible = false;
+          }
         }
 
         // Check row-level arithmetic integrity
-        const lineExpected = Math.round(updated.quantity * updated.unit_price * 100) / 100;
-        if (Math.abs(lineExpected - updated.total) > 1.0) {
+        if (updated.quantity == null || updated.unit_price == null || updated.total == null) {
           updated.isFlagged = true;
-          updated.flagReason = `Diff: ${updated.quantity} × Rs. ${updated.unit_price} = Rs. ${lineExpected.toFixed(2)}`;
+          updated.flagReason = 'Missing or illegible figure on bill';
         } else {
-          updated.isFlagged = false;
-          updated.flagReason = undefined;
+          const lineExpected = Math.round(Number(updated.quantity) * Number(updated.unit_price) * 100) / 100;
+          if (Math.abs(lineExpected - Number(updated.total)) > 1.0) {
+            updated.isFlagged = true;
+            updated.flagReason = `Diff: ${updated.quantity} × Rs. ${updated.unit_price} = Rs. ${lineExpected.toFixed(2)}`;
+          } else {
+            updated.isFlagged = false;
+            updated.flagReason = undefined;
+          }
         }
 
         return updated;
@@ -137,12 +163,21 @@ export function ScreenReview({
   // Recalculate all row totals based on qty * unit_price
   const handleRecalculateAllRows = () => {
     setItems((prev) =>
-      prev.map((it) => ({
-        ...it,
-        total: Math.round(it.quantity * it.unit_price * 100) / 100,
-        isFlagged: false,
-        flagReason: undefined,
-      }))
+      prev.map((it) => {
+        if (it.quantity != null && it.unit_price != null) {
+          return {
+            ...it,
+            total: Math.round(Number(it.quantity) * Number(it.unit_price) * 100) / 100,
+            isFlagged: false,
+            flagReason: undefined,
+          };
+        }
+        return {
+          ...it,
+          isFlagged: true,
+          flagReason: 'Missing or illegible figure on bill',
+        };
+      })
     );
   };
 
@@ -156,6 +191,9 @@ export function ScreenReview({
       invoice_date: invoiceDate,
       category,
       items,
+      subtotal: subtotalInput,
+      discount: discountInput,
+      tax: taxInput,
       grand_total: Number(grandTotalInput) || 0,
       calculated_total: Math.round(calculatedTotal * 100) / 100,
       discrepancy: Math.round(discrepancy * 100) / 100,
@@ -452,7 +490,12 @@ export function ScreenReview({
                             item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
                           }`}
                         />
-                        {item.flagReason && (
+                        {item.is_illegible && (
+                          <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                            ⚠️ Torn or illegible field detected on bill (Null guardrail active)
+                          </span>
+                        )}
+                        {item.flagReason && !item.is_illegible && (
                           <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
                             ⚠️ {item.flagReason}
                           </span>
@@ -464,10 +507,12 @@ export function ScreenReview({
                         <input
                           type="number"
                           step="any"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            handleItemChange(item.id!, 'quantity', parseFloat(e.target.value) || 0)
-                          }
+                          value={item.quantity ?? ''}
+                          placeholder="-"
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
+                          }}
                           className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
                         />
                       </td>
@@ -488,10 +533,12 @@ export function ScreenReview({
                         <input
                           type="number"
                           step="0.01"
-                          value={item.unit_price}
-                          onChange={(e) =>
-                            handleItemChange(item.id!, 'unit_price', parseFloat(e.target.value) || 0)
-                          }
+                          value={item.unit_price ?? ''}
+                          placeholder="-"
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
+                          }}
                           className="w-full bg-slate-950/80 border border-slate-700 rounded px-2.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
                         />
                       </td>
@@ -501,10 +548,12 @@ export function ScreenReview({
                         <input
                           type="number"
                           step="0.01"
-                          value={item.total}
-                          onChange={(e) =>
-                            handleItemChange(item.id!, 'total', parseFloat(e.target.value) || 0)
-                          }
+                          value={item.total ?? ''}
+                          placeholder="-"
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
+                          }}
                           className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
                             item.isFlagged
                               ? 'border-amber-500 text-amber-300 bg-amber-950/40'
