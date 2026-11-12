@@ -132,9 +132,10 @@ export async function POST(req: NextRequest) {
     // Candidate vision models with gemini-3.8-flash as primary
     const candidateModels = [
       'gemini-3.8-flash',
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.8-pro',
+      'gemini-2.5-pro',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-pro-latest',
     ];
 
     let lastError: any = null;
@@ -195,13 +196,33 @@ export async function POST(req: NextRequest) {
       },
     ];
 
+    // Retry helper with backoff for temporary 503 (high demand spikes)
+    async function attemptModelWithRetry(modelName: string, maxRetries = 2): Promise<any> {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await ai.models.generateContent({
+            model: modelName,
+            contents: requestContents,
+            config: requestConfig,
+          });
+          if (res && res.text) return res;
+        } catch (err: any) {
+          const errMsg = err?.message || String(err);
+          const is503 = errMsg.includes('503') || err?.status === 503 || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
+          
+          if (is503 && attempt < maxRetries) {
+            console.log(`[LankaBill API] Model ${modelName} 503 high demand spike. Auto-retrying in 1.2s (${attempt + 1}/${maxRetries})...`);
+            await new Promise((r) => setTimeout(r, 1200));
+            continue;
+          }
+          throw err;
+        }
+      }
+    }
+
     for (const model of candidateModels) {
       try {
-        response = await ai.models.generateContent({
-          model,
-          contents: requestContents,
-          config: requestConfig,
-        });
+        response = await attemptModelWithRetry(model, 2);
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;

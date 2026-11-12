@@ -80,43 +80,57 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       const compResult = await compressInvoiceImage(file, 1600, 0.85);
       setCompressionInfo(compResult);
 
-      // 2. Call Gemini Vision API Route
+      // 2. Call Gemini Vision API Route with 35s timeout
       setLoadingStep('Reading bill with Gemini Flash...');
       const userSettings = getUserSettings();
 
-      const response = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: compResult.base64Data,
-          mimeType: compResult.mimeType,
-          userApiKey: userSettings.geminiApiKey || undefined,
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
-      const json = await response.json();
+      try {
+        const response = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            imageBase64: compResult.base64Data,
+            mimeType: compResult.mimeType,
+            userApiKey: userSettings.geminiApiKey || undefined,
+          }),
+        });
 
-      if (!response.ok || !json.success) {
-        throw new Error(json.error || 'Failed to extract bill data.');
+        clearTimeout(timeoutId);
+        const json = await response.json();
+
+        if (!response.ok || !json.success) {
+          throw new Error(json.error || 'Failed to extract bill data.');
+        }
+
+        setLoadingStep('Structuring itemized inventory & arithmetic check...');
+
+        // Use server-converted JPEG display URL if available (ensures iPhone HEIC photos render in all browsers)
+        const finalImageUrl = json.displayImageUrl || compResult.base64Data;
+
+        onExtractionComplete({
+          extraction: json.data,
+          imageUrl: finalImageUrl,
+          processingTimeMs: json.processingTimeMs || Math.round(loadingTimer * 1000),
+          compressionStats: compResult,
+        });
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      setLoadingStep('Structuring itemized inventory & arithmetic check...');
-      stopTimer();
-
-      // Use server-converted JPEG display URL if available (ensures iPhone HEIC photos render in all browsers)
-      const finalImageUrl = json.displayImageUrl || compResult.base64Data;
-
-      onExtractionComplete({
-        extraction: json.data,
-        imageUrl: finalImageUrl,
-        processingTimeMs: json.processingTimeMs || Math.round(loadingTimer * 1000),
-        compressionStats: compResult,
-      });
     } catch (err: any) {
       console.error('Scan error:', err);
+      const isTimeout = err.name === 'AbortError';
+      setErrorMsg(
+        isTimeout
+          ? 'Scanning timed out after 35s. Please try again.'
+          : (err.message || 'Error processing bill photo. Please try again.')
+      );
+    } finally {
       stopTimer();
       setIsProcessing(false);
-      setErrorMsg(err.message || 'Error processing bill photo. Please try again.');
     }
   };
 
