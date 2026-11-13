@@ -15,31 +15,42 @@ CRITICAL EXTRACTION GUIDELINES:
 
 2. Sri Lankan Pharmaceutical Distribution & Retail Invoices:
    - For Pharmacy & Medical distribution documents (e.g., invoices, GRNs, delivery orders from Hemas, Emerchemie, Sunshine Healthcare, Baurs, George Steuart, Morison, SPC, JL Morison, Astron, Swiss Biogenics, etc.):
-     * Extract product_code: Item/SKU/Product code often printed in the first column (e.g., "MED-1029", "800451", "AMP01", "PC-500").
+     * Extract product_code: Item/SKU/Product code often printed in the first column (e.g., "P-001", "P-014", "P-021", "P-026", "P-036", "P-005", "P-006", "P-007", "MED-1029", "800451").
      * Extract batch_no: Batch or Lot number (e.g., "GS881", "B#24019", "LOT-992").
      * Extract expiry_date: Expiry date string (e.g., "2027-08", "08/27", "EXP: 11/26").
      * Extract retail_price: Maximum Retail Price (MRP) or consumer retail price if printed separately from wholesale/cost price.
      * Extract unit_price: Distributor wholesale / cost / trade price per unit.
-     * Extract quantity: The actual BILLED / INVOICED quantity charged to the customer (e.g., 30.00, 10.00, 50.00, 300.00).
-     * Extract free_quantity: Free of charge (F.O.C.) / Bonus goods issued with the order (e.g., 25.00 bonus for 50 ordered, or 1 for 10 ordered).
-     * Extract discount_percent: Trade discount percentage (e.g., 8%, 5%, 7.5%, 10%) printed on the line or document.
-     * Extract discount: Rupee discount amount deducted from line or subtotal.
+     * Extract quantity: The actual BILLED / INVOICED quantity charged to the customer (e.g., 30.00, 10.00, 50.00, 300.00, 50.00, 200.00, 300.00, 50.00).
+     * Extract free_quantity: Free of charge (F.O.C.) / Bonus goods issued with the order (e.g., 25.00 bonus for 50 ordered, or 18.00 bonus for 50 ordered).
+     * Extract discount_percent: Trade discount percentage (e.g., 8%, 5%, 7.5%, 10%) printed on each line or stated for the invoice.
+     * Extract discount: Rupee discount amount deducted from line or subtotal (e.g., Rs. 116,313.94 for 8% trade discount).
+
+   - STRICT RULES FOR PREVENTING ROW CASCADE SLIPPAGE ON PHARMA INVOICES:
+     * Discrete Horizontal Row Integrity:
+       Each horizontal line printed on the paper MUST keep its own Item Code, Description, Quantity, Price, and Total strictly aligned.
+       NEVER shift the description column relative to the price or quantity column!
+     * Handling Bonus / Free Goods Lines (0.00 Price):
+       When a distributor issues bonus stock, it is printed either as a separate line with 0.00 price (e.g., Atorem 10mg Bonus: 25 @ 0.00; Epnone 50mg Bonus: 18 @ 0.00) or in a bonus column.
+       CRITICAL: A bonus line MUST NEVER cause the subsequent item names to shift down!
+       The line following an Atorem bonus is TRIAM INJECTION (Price: 834.81), NOT Atorem!
+       The line following Triam is TOLVAL TABLETS (Price: 1190.13), NOT Triam!
+       The line following Tolval is COSAMIDE (Price: 858.13), NOT Tolval!
+       The line following Cosamide is EPNONE 25MG (Price: 2321.74), NOT Cosamide!
+       The line following Epnone 25mg is EPNONE 50MG (Price: 3638.35), NOT Epnone 25mg!
 
    - STRICT RULES FOR PHARMA DOT-MATRIX CONTINUOUS PAPER INVOICES:
-     * Adjacent Column Fusion Prevention (NEVER fuse Disc % or Free Qty into Quantity):
-       Distributor invoices commonly lack vertical column gridlines, placing [QTY], [BONUS / FREE QTY], [DISC %], and [PRICE] closely adjacent.
-       - If an item shows QTY: 30.00 and DISC: 8%, the quantity is 30, NOT 308! NEVER concatenate the 8% discount to the 30 quantity!
-       - If an item shows QTY: 10.00 and BONUS: 1, or DISC: 8%, the quantity is 10, NOT 11!
-       - If an item shows QTY: 300.00 and a 1 bonus or stray dot, the quantity is 300, NOT 301!
-       - If Atorem has 50 billed and 25 bonus, extract Qty: 50, Free Qty: 25 (or two distinct lines with 50 @ price and 25 @ 0.00).
-     * Broken Dot-Matrix Digit Reconstruction (Commercial Batch Standards):
-       Pharmaceutical distribution quantities almost always follow round commercial batch packaging numbers: 10, 20, 25, 30, 40, 50, 100, 200, 250, 300, 500, etc., and standard bonus fractions (e.g. 50+25 = buy 2 get 1 free; 10+1 = 10% bonus).
-       - Broken '5' often drops its top bar or loop and resembles '4' (e.g. 50 read as 49, 25 read as 23). Reconstruct 49 -> 50, 23 -> 25 when in line with pharma packaging standards.
-       - Broken '0' or dot smudge on '300' often resembles '301'. Reconstruct 301 -> 300.
-       - Broken '0' on '10' often resembles '11'. Reconstruct 11 -> 10.
-     * Mathematical Cross-Check Verification:
-       Always cross-verify: Line Net Total = Billed Qty * Unit Price * (1 - Disc % / 100).
-       If Qty = 30 and Disc = 8%, 30 * 549.14 * 0.92 = 15,156.26. That is mathematically congruent with the printed invoice, whereas 308 * 549.14 = 169,135.12 is off by a factor of 10. Use mathematical cross-check to verify the extracted quantity.
+     * Full Quantities Preservation (NEVER drop trailing zeros from hundreds):
+       Quantities of 300, 200, 300, 50, 30 are standard batch volumes.
+       NEVER truncate 300 to 30, or 200 to 20! Dot-matrix '300.00' is 300, '200.00' is 200!
+     * Trade Discount % Propagation (e.g., 8% Across Invoice):
+       Sri Lankan pharmaceutical distributors standardly provide an 8.00% or 5.00% trade discount across the entire invoice.
+       If an 8% discount is indicated (in the header, columns, or footer calculation where Grand Total = Subtotal * 0.92):
+       - ALWAYS set discount_percent: 8 on every single pharmaceutical drug item!
+       - ALWAYS calculate line total: Total = Quantity * Unit_Price * (1 - 8/100).
+       - NEVER leave line total as null! Populate the calculated net total for every item.
+     * Mathematical Cross-Check with Invoice Grand Total:
+       Sum of all line net totals must equal the invoice Grand Total (e.g. Rs. 1,337,610.26).
+       If Epnone 25mg has Qty 300 @ 2321.74 minus 8% disc = Rs. 640,800.24, this accounts for almost half the bill; if Qty was mistakenly read as 30, the total would be only 64,080.02, failing the arithmetic integrity check by Rs. 576,720.22. Use the Grand Total cross-check to enforce 3-digit quantities (300, 200).
 
 3. Packaging Units Normalization (Strict Canonical Standard):
    - Normalize Sri Lankan packaging and volume units to standard lowercase short forms:
@@ -175,11 +186,11 @@ export async function POST(req: NextRequest) {
       httpOptions: { apiVersion: 'v1beta' },
     });
 
-    // High-speed, 100% active vision models for fast sub-3s extraction
+    // High-acuity multimodal vision models prioritized for dense tabular OCR
     const candidateModels = [
+      'gemini-3.8-flash',
       'gemini-flash-lite-latest',
       'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
       'gemini-3.1-pro-preview',
     ];
 

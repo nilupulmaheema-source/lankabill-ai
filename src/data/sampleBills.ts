@@ -432,5 +432,193 @@ export const SAMPLE_BILLS: SampleBill[] = [
       grand_total: 14625.00,
       confidence_notes: 'Extracted with subtotal (15,000), 5% trade discount (-750), and tax (375). Arithmetic perfectly verified.'
     }
+  },
+  {
+    id: 'sample-pharma-distributor-8pct',
+    title: 'Pharma Distributor Invoice (8% Trade Disc & FOC Bonus)',
+    category: 'Pharmacy',
+    description: 'Specialty cardiovascular & antibiotic distributor invoice with 8% trade discount, FOC bonus stock, and Rs. 1.33M Grand Total.',
+    imageUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="950" viewBox="0 0 600 950" style="background:#ffffff; font-family:monospace; color:#0f172a;">
+        <rect width="600" height="950" fill="#ffffff"/>
+        <rect x="20" y="20" width="560" height="910" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="300" y="60" font-size="18" font-weight="bold" text-anchor="middle" fill="#0f766e">SRI LANKA PHARMACEUTICAL DISTRIBUTORS (PVT) LTD</text>
+        <text x="300" y="80" font-size="11" text-anchor="middle" fill="#64748b">Colombo 10 | NMRA Distributor Licence: W-0941 | Tel: 011-2691234</text>
+        <line x1="30" y1="95" x2="570" y2="95" stroke="#0f766e" stroke-width="2"/>
+        <text x="35" y="120" font-size="11"><b>Invoice No:</b> DIS-2026-8812</text>
+        <text x="35" y="140" font-size="11"><b>Customer:</b> City Care Pharmacy</text>
+        <text x="380" y="120" font-size="11"><b>Date:</b> 2026-11-13</text>
+        <text x="380" y="140" font-size="11"><b>Terms:</b> Trade Disc 8% Allowed</text>
+        
+        <rect x="30" y="160" width="540" height="24" fill="#f0fdfa"/>
+        <text x="35" y="176" font-size="10" font-weight="bold">CODE</text>
+        <text x="85" y="176" font-size="10" font-weight="bold">DESCRIPTION</text>
+        <text x="270" y="176" font-size="10" font-weight="bold">QTY</text>
+        <text x="330" y="176" font-size="10" font-weight="bold">BONUS</text>
+        <text x="390" y="176" font-size="10" font-weight="bold">W/SALE</text>
+        <text x="470" y="176" font-size="10" font-weight="bold">DISC%</text>
+        <text x="560" y="176" font-size="10" font-weight="bold" text-anchor="end">NET TOTAL</text>
+        <line x1="30" y1="188" x2="570" y2="188" stroke="#cbd5e1" stroke-width="1"/>
+
+        <text x="35" y="210" font-size="10">P-001</text>
+        <text x="85" y="210" font-size="10">Algic 100mg (3x10s)</text>
+        <text x="270" y="210" font-size="10">30.00</text>
+        <text x="330" y="210" font-size="10">-</text>
+        <text x="390" y="210" font-size="10">549.14</text>
+        <text x="470" y="210" font-size="10">8%</text>
+        <text x="560" y="210" font-size="10" text-anchor="end">15,156.26</text>
+
+        <text x="35" y="235" font-size="10">P-014</text>
+        <text x="85" y="235" font-size="10">Pulmofirst 62.5mg (1x10s)</text>
+        <text x="270" y="235" font-size="10">10.00</text>
+        <text x="330" y="235" font-size="10">-</text>
+        <text x="390" y="235" font-size="10">3,395.65</text>
+        <text x="470" y="235" font-size="10">8%</text>
+        <text x="560" y="235" font-size="10" text-anchor="end">31,239.98</text>
+
+        <text x="35" y="260" font-size="10">P-021</text>
+        <text x="85" y="260" font-size="10">Atorem 10mg (10x10s)</text>
+        <text x="270" y="260" font-size="10">50.00</text>
+        <text x="330" y="260" font-size="10">25.00</text>
+        <text x="390" y="260" font-size="10">869.57</text>
+        <text x="470" y="260" font-size="10">8%</text>
+        <text x="560" y="260" font-size="10" text-anchor="end">40,000.22</text>
+
+        <text x="35" y="285" font-size="10">P-026</text>
+        <text x="85" y="285" font-size="10">Triam Injection</text>
+        <text x="270" y="285" font-size="10">300.00</text>
+        <text x="330" y="285" font-size="10">-</text>
+        <text x="390" y="285" font-size="10">834.81</text>
+        <text x="470" y="285" font-size="10">8%</text>
+        <text x="560" y="285" font-size="10" text-anchor="end">230,407.56</text>
+
+        <text x="35" y="310" font-size="10">P-036</text>
+        <text x="85" y="310" font-size="10">Tolval tablets 15mg (1x4s)</text>
+        <text x="270" y="310" font-size="10">50.00</text>
+        <text x="330" y="310" font-size="10">-</text>
+        <text x="390" y="310" font-size="10">1,190.13</text>
+        <text x="470" y="310" font-size="10">8%</text>
+        <text x="560" y="310" font-size="10" text-anchor="end">54,745.98</text>
+
+        <text x="35" y="335" font-size="10">P-005</text>
+        <text x="85" y="335" font-size="10">Cosamide 100mg (1x10s)</text>
+        <text x="270" y="335" font-size="10">200.00</text>
+        <text x="330" y="330" font-size="10">-</text>
+        <text x="390" y="335" font-size="10">858.13</text>
+        <text x="470" y="335" font-size="10">8%</text>
+        <text x="560" y="335" font-size="10" text-anchor="end">157,895.92</text>
+
+        <text x="35" y="360" font-size="10">P-006</text>
+        <text x="85" y="360" font-size="10">Epnone 25mg (3x10s)</text>
+        <text x="270" y="360" font-size="10">300.00</text>
+        <text x="330" y="360" font-size="10">-</text>
+        <text x="390" y="360" font-size="10">2,321.74</text>
+        <text x="470" y="360" font-size="10">8%</text>
+        <text x="560" y="360" font-size="10" text-anchor="end">640,800.24</text>
+
+        <text x="35" y="385" font-size="10">P-007</text>
+        <text x="85" y="385" font-size="10">Epnone 50mg (3x10s)</text>
+        <text x="270" y="385" font-size="10">50.00</text>
+        <text x="330" y="385" font-size="10">18.00</text>
+        <text x="390" y="385" font-size="10">3,638.35</text>
+        <text x="470" y="385" font-size="10">8%</text>
+        <text x="560" y="385" font-size="10" text-anchor="end">167,364.10</text>
+
+        <line x1="30" y1="410" x2="570" y2="410" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="350" y="440" font-size="11">Gross Subtotal:</text>
+        <text x="560" y="440" font-size="11" text-anchor="end">Rs. 1,453,924.20</text>
+        <text x="350" y="465" font-size="11" fill="#0d9488">Less Trade Disc (8.00%):</text>
+        <text x="560" y="465" font-size="11" fill="#0d9488" text-anchor="end">- Rs. 116,313.94</text>
+        <line x1="340" y1="480" x2="570" y2="480" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="350" y="505" font-size="13" font-weight="bold">NET INVOICE TOTAL:</text>
+        <text x="560" y="505" font-size="14" font-weight="bold" fill="#0f766e" text-anchor="end">Rs. 1,337,610.26</text>
+      </svg>
+    `),
+    data: {
+      vendor_name: 'Sri Lanka Pharmaceutical Distributors (Pvt) Ltd',
+      invoice_number: 'DIS-2026-8812',
+      invoice_date: '2026-11-13',
+      category: 'Pharmacy',
+      items: [
+        {
+          name: 'Algic 100mg (3x10s)',
+          product_code: 'P-001',
+          quantity: 30,
+          unit: 'box',
+          unit_price: 549.14,
+          discount_percent: 8,
+          total: 15156.26,
+        },
+        {
+          name: 'Pulmofirst 62.5mg (1x10s)',
+          product_code: 'P-014',
+          quantity: 10,
+          unit: 'box',
+          unit_price: 3395.65,
+          discount_percent: 8,
+          total: 31239.98,
+        },
+        {
+          name: 'Atorem 10mg (10x10s)',
+          product_code: 'P-021',
+          quantity: 50,
+          free_quantity: 25,
+          unit: 'box',
+          unit_price: 869.57,
+          discount_percent: 8,
+          total: 40000.22,
+        },
+        {
+          name: 'Triam Injection',
+          product_code: 'P-026',
+          quantity: 300,
+          unit: 'amp',
+          unit_price: 834.81,
+          discount_percent: 8,
+          total: 230407.56,
+        },
+        {
+          name: 'Tolval tablets 15mg (1x4s)',
+          product_code: 'P-036',
+          quantity: 50,
+          unit: 'box',
+          unit_price: 1190.13,
+          discount_percent: 8,
+          total: 54745.98,
+        },
+        {
+          name: 'Cosamide 100mg (1x10s)',
+          product_code: 'P-005',
+          quantity: 200,
+          unit: 'box',
+          unit_price: 858.13,
+          discount_percent: 8,
+          total: 157895.92,
+        },
+        {
+          name: 'Epnone 25mg (3x10s)',
+          product_code: 'P-006',
+          quantity: 300,
+          unit: 'box',
+          unit_price: 2321.74,
+          discount_percent: 8,
+          total: 640800.24,
+        },
+        {
+          name: 'Epnone 50mg (3x10s)',
+          product_code: 'P-007',
+          quantity: 50,
+          free_quantity: 18,
+          unit: 'box',
+          unit_price: 3638.35,
+          discount_percent: 8,
+          total: 167364.10,
+        },
+      ],
+      subtotal: 1453924.20,
+      discount: 116313.94,
+      grand_total: 1337610.26,
+      confidence_notes: '100% verified. 8 pharmaceutical line items with 8% trade discount, FOC bonus stock (25 Atorem, 18 Epnone), and exact net arithmetic match (Rs. 1,337,610.26).'
+    }
   }
 ];

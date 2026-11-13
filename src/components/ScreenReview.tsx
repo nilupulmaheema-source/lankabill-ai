@@ -68,18 +68,34 @@ export function ScreenReview({
     initialData.tax ?? null
   );
 
-  // Line items state
-  const [items, setItems] = useState<InvoiceItem[]>(
-    (initialData.items || []).map((it, idx) => ({
-      ...it,
-      id: it.id || `item-${Date.now()}-${idx}`,
-      unit: it.unit || 'nos',
-      quantity: it.quantity ?? null,
-      free_quantity: it.free_quantity ?? null,
-      unit_price: it.unit_price ?? null,
-      total: it.total ?? null,
-    }))
-  );
+  // Line items state with automatic total and discount inference
+  const [items, setItems] = useState<InvoiceItem[]>(() => {
+    const sub = initialData.subtotal || 0;
+    const disc = initialData.discount || 0;
+    const inferredDiscPct = sub > 0 && disc > 0 ? Math.round((disc / sub) * 100 * 10) / 10 : null;
+
+    return (initialData.items || []).map((it, idx) => {
+      const discPct = it.discount_percent ?? inferredDiscPct ?? 0;
+      let lineTotal = it.total ?? null;
+
+      // Auto-compute line total if not provided by OCR but qty & price exist
+      if (lineTotal == null && it.quantity != null && it.unit_price != null) {
+        const raw = Number(it.quantity) * Number(it.unit_price);
+        lineTotal = Math.round(raw * (1 - discPct / 100) * 100) / 100;
+      }
+
+      return {
+        ...it,
+        id: it.id || `item-${Date.now()}-${idx}`,
+        unit: it.unit || 'nos',
+        quantity: it.quantity ?? null,
+        free_quantity: it.free_quantity ?? null,
+        unit_price: it.unit_price ?? null,
+        discount_percent: discPct > 0 ? discPct : (it.discount_percent ?? 0),
+        total: lineTotal,
+      };
+    });
+  });
 
   // Mobile layout mode: 'split' | 'photo' | 'form'
   const [mobileView, setMobileView] = useState<'split' | 'photo' | 'form'>('split');
@@ -216,6 +232,25 @@ export function ScreenReview({
           ...it,
           isFlagged: true,
           flagReason: 'Missing or illegible figure on bill',
+        };
+      })
+    );
+  };
+
+  // Apply uniform discount % across all line items
+  const handleApplyAllDiscount = (pct: number) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        const qty = Number(it.quantity) || 0;
+        const price = Number(it.unit_price) || 0;
+        const rawLine = qty * price;
+        const netLine = rawLine * (1 - pct / 100);
+        return {
+          ...it,
+          discount_percent: pct,
+          total: Math.round(netLine * 100) / 100,
+          isFlagged: false,
+          flagReason: undefined,
         };
       })
     );
@@ -492,14 +527,26 @@ export function ScreenReview({
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleAddRow}
-                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Row</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {category === 'Pharmacy' && (
+                  <button
+                    type="button"
+                    onClick={() => handleApplyAllDiscount(8)}
+                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-200 border border-teal-600 transition-colors"
+                    title="Apply standard 8% Sri Lankan pharma distributor trade discount to all items"
+                  >
+                    <span>⚡ Apply 8% Trade Disc</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Row</span>
+                </button>
+              </div>
             </div>
 
             {/* Mobile Cards for < 640px / Responsive Table for >= 640px */}
