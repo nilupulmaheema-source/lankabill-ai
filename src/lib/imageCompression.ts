@@ -222,6 +222,12 @@ export async function compressInvoiceImage(
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        // Optical document enhancement: boosts contrast & clarity for faint dot-matrix pins and broken carbon copy handwriting
+        try {
+          ctx.filter = 'contrast(108%) brightness(102%)';
+        } catch {
+          // Graceful fallback if unsupported
+        }
         ctx.drawImage(img, 0, 0, width, height);
 
         const mimeType = 'image/jpeg';

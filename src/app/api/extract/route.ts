@@ -26,10 +26,23 @@ CRITICAL EXTRACTION GUIDELINES:
    - Extract the printed Grand Total.
    - ANTI-HALLUCINATION GUARDRAIL: If handwriting or numeric values are torn off, smudged, cut off, or completely illegible, set quantity/unit_price/total to null and set is_illegible to true. NEVER fabricate or guess numbers.
 
-4. Category Classification:
+4. Broken, Faint, and Half-Written English/Numeric Character Reconstruction:
+   - Physical bills in Sri Lanka frequently suffer from:
+     * Dot-matrix pin drops (e.g. missing pin lines making "E" look like "F" or "L", "B" look like "13" or "8", "D" look like "O", "P" look like "I:").
+     * Faint carbon copy bleed-through (only partial pen pressure transferring).
+     * Worn thermal printheads (vertical blank lines slicing through words).
+     * Fast cursive/shorthand handwriting (half-formed letters, e.g. "Panadl", "Amox", "Cemnt", "Takrn").
+   - GUIDELINES FOR RECONSTRUCTING BROKEN CHARACTERS:
+     * Contextual Word Reconstruction: Use whole-word context and commercial trade knowledge to reconstruct broken or half-written English words (e.g., "T_kyo Sup_r" -> "Tokyo Super", "Augm_ntin" -> "Augmentin", "S-_on" -> "S-Lon PVC", "Tor St__l" -> "Tor Steel", "P_nadol" -> "Panadol", "Anc_or" -> "Anchor", "Cem_nt" -> "Cement").
+     * Disambiguation by Column Context:
+       - In Quantity / Price / Total columns: Broken "O" is digit 0; broken "l" or "I" is digit 1; broken "S" is digit 5; broken "B" is digit 8; faint stray marks near digits are decimal points.
+       - In Description columns: Distinguish letters based on Sri Lankan brand names and product catalogs.
+     * Mathematical Cross-Deduction: If one digit in a price or quantity is half-written or broken, use the arithmetic relation (Quantity * Unit Price = Total) to mathematically reconstruct the missing stroke with certainty.
+
+5. Category Classification:
    - Determine the most accurate category: "Pharmacy", "Hardware", "General", or "Utilities".
 
-5. Format:
+6. Format:
    - Output valid JSON conforming strictly to the requested schema.
 `;
 
