@@ -27,8 +27,15 @@ CRITICAL EXTRACTION GUIDELINES:
 
    - STRICT RULES FOR PREVENTING ROW CASCADE SLIPPAGE ON PHARMA INVOICES:
      * Discrete Horizontal Row Integrity:
-       Each horizontal line printed on the paper MUST keep its own Item Code, Description, Quantity, Price, and Total strictly aligned.
+       Each horizontal line printed on the paper MUST keep its own Item Code, Description, Quantity, Price, Discount %, and Value strictly aligned.
        NEVER shift the description column relative to the price or quantity column!
+     * Multi-Line Description Wrapping (e.g. 'Nioderm Face Wash' + '100ml', or 'Nioderm Super Serum' + '30ml'):
+       When a drug description wraps onto two lines in the Description column (such as packaging size '100ml' or '30ml' on the second line), combine them into a single item name (e.g., 'Nioderm Face Wash 100ml'). NEVER treat the wrapped text as an empty row or shift subsequent rows!
+     * Top-Line Item Extraction (e.g. 'Biofol'):
+       The first description row 'Biofol' aligns with the first Batch ('KC26073'), first Qty (5.00), first Price (1,826.09), Discount (8.00%), and Value (8,400.01). NEVER leave the first item's quantity empty or shift Qty 5 to the second item!
+     * Printed Columns 'Discount %' and 'Value(Rs.)':
+       When an invoice has a column labeled 'Discount %' with values like '8.00', extract discount_percent: 8.00 on every row.
+       Extract the printed 'Value(Rs.)' or line net total into total.
      * Handling Bonus / Free Goods Lines (0.00 Price):
        When a distributor issues bonus stock, it is printed either as a separate line with 0.00 price (e.g., Atorem 10mg Bonus: 25 @ 0.00; Epnone 50mg Bonus: 18 @ 0.00) or in a bonus column.
        CRITICAL: A bonus line MUST NEVER cause the subsequent item names to shift down!
@@ -262,7 +269,7 @@ export async function POST(req: NextRequest) {
             },
           },
           {
-            text: 'Analyze this physical Sri Lankan invoice / chit photo. Extract all header fields and line items into strict JSON according to the schema.',
+            text: 'Analyze this physical Sri Lankan invoice / chit photo. Extract all header fields and line items into strict JSON according to the schema. Ensure Discount % column (e.g. 8.00) is extracted into discount_percent, and Value(Rs.) is extracted into total for each line item.',
           },
         ],
       },
@@ -312,6 +319,29 @@ export async function POST(req: NextRequest) {
 
     const responseText = response.text?.trim() || '{}';
     let parsedJson = JSON.parse(responseText);
+
+    // Normalize line items: ensure discount_percent and total are populated
+    if (Array.isArray(parsedJson.items)) {
+      parsedJson.items = parsedJson.items.map((it: any) => {
+        const qty = it.quantity != null ? Number(it.quantity) : null;
+        const price = it.unit_price != null ? Number(it.unit_price) : null;
+        let discPct = it.discount_percent != null && !isNaN(Number(it.discount_percent)) ? Number(it.discount_percent) : 0;
+        let lineTotal = it.total != null && !isNaN(Number(it.total)) ? Number(it.total) : null;
+
+        if (lineTotal == null && qty != null && price != null) {
+          const raw = qty * price;
+          lineTotal = Math.round(raw * (1 - discPct / 100) * 100) / 100;
+        }
+
+        return {
+          ...it,
+          quantity: qty,
+          unit_price: price,
+          discount_percent: discPct,
+          total: lineTotal,
+        };
+      });
+    }
 
     // Validate using Zod schema
     const validated = InvoiceExtractionSchema.safeParse(parsedJson);
