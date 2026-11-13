@@ -85,7 +85,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       const userSettings = getUserSettings();
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
 
       try {
         const response = await fetch('/api/extract', {

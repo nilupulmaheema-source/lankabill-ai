@@ -190,11 +190,11 @@ export async function POST(req: NextRequest) {
       httpOptions: { apiVersion: 'v1beta' },
     });
 
-    // High-acuity multimodal vision models prioritized for dense tabular OCR
+    // High-speed, responsive vision models calibrated for fast sub-5s extraction
     const candidateModels = [
-      'gemini-3.8-flash',
       'gemini-flash-lite-latest',
       'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
       'gemini-3.1-pro-preview',
     ];
 
@@ -268,14 +268,34 @@ export async function POST(req: NextRequest) {
       },
     ];
 
+    // Fast failover helper with 12s timeout per model to eliminate 60s stalls
+    const generateWithTimeout = async (model: string, timeoutMs = 12000) => {
+      let timer: NodeJS.Timeout;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Model ${model} response exceeded ${timeoutMs}ms limit`)),
+          timeoutMs
+        );
+      });
+      try {
+        const result = await Promise.race([
+          ai.models.generateContent({
+            model,
+            contents: requestContents,
+            config: requestConfig,
+          }),
+          timeoutPromise,
+        ]);
+        return result;
+      } finally {
+        clearTimeout(timer!);
+      }
+    };
+
     // Attempt candidate models with zero stall: fast failover to the first responsive model
     for (const model of candidateModels) {
       try {
-        response = await ai.models.generateContent({
-          model,
-          contents: requestContents,
-          config: requestConfig,
-        });
+        response = await generateWithTimeout(model, 12000);
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;
