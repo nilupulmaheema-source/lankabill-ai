@@ -86,6 +86,27 @@ export const CATEGORY_CONFIG = {
 } as const satisfies Record<InvoiceCategory, CategoryConfig>;
 
 // ============================================================================
+// 3.5 Price Comparison & Radar Types (Day 2 Polish & The Magic Moment)
+// ============================================================================
+export interface PriceComparison {
+  previous_price: number;
+  previous_date: string;
+  previous_vendor?: string;
+  diff_amount: number;
+  diff_percentage: number;
+  status: 'increased' | 'decreased' | 'unchanged' | 'new';
+}
+
+export const PriceComparisonSchema = z.object({
+  previous_price: z.number(),
+  previous_date: z.string(),
+  previous_vendor: z.string().optional(),
+  diff_amount: z.number(),
+  diff_percentage: z.number(),
+  status: z.enum(['increased', 'decreased', 'unchanged', 'new']),
+});
+
+// ============================================================================
 // 4. Zod Schemas with Coercion & Inferred Types (Day 1 Calibrated)
 // ============================================================================
 export const InvoiceItemSchema = z.object({
@@ -105,6 +126,8 @@ export const InvoiceItemSchema = z.object({
   is_illegible: z.boolean().optional(),
   isFlagged: z.boolean().optional(),
   flagReason: z.string().optional(),
+  bounding_box: z.array(z.number()).length(4).nullable().optional(),
+  price_comparison: PriceComparisonSchema.nullable().optional(),
 });
 
 export type InvoiceItem = z.infer<typeof InvoiceItemSchema>;

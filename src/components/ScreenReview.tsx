@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +19,10 @@ import {
   Eye,
   FileEdit,
   Wand2,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  ShieldAlert,
 } from 'lucide-react';
 import { PanZoomViewer } from './PanZoomViewer';
 import {
@@ -30,6 +34,7 @@ import {
   checkArithmeticIntegrity,
   CATEGORY_CONFIG,
 } from '@/types/invoice';
+import { analyzePriceCreep, PriceCreepAnalysis } from '@/lib/priceRadar';
 
 interface ScreenReviewProps {
   initialData: InvoiceExtraction;
@@ -100,6 +105,23 @@ export function ScreenReview({
   // Mobile layout mode: 'split' | 'photo' | 'form'
   const [mobileView, setMobileView] = useState<'split' | 'photo' | 'form'>('split');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Day 2 Magic Moment: Visual Grounding & Price Creep Radar state
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(items.length > 0 ? 0 : null);
+  const [priceAnalysis, setPriceAnalysis] = useState<PriceCreepAnalysis | null>(null);
+
+  // Analyze price creep against previous store records
+  useEffect(() => {
+    let isMounted = true;
+    analyzePriceCreep(items).then((analysis) => {
+      if (isMounted) {
+        setPriceAnalysis(analysis);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [items]);
 
   // Arithmetic Integrity Check (Discriminated Union pattern with Day 1 Calibrated Tolerance)
   const integrity = useMemo(
@@ -201,7 +223,18 @@ export function ScreenReview({
 
   // Delete row
   const handleDeleteRow = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setItems((prev) => {
+      const idx = prev.findIndex((item) => item.id === id);
+      const next = prev.filter((item) => item.id !== id);
+      if (activeItemIndex != null) {
+        if (next.length === 0) {
+          setActiveItemIndex(null);
+        } else if (activeItemIndex >= next.length) {
+          setActiveItemIndex(next.length - 1);
+        }
+      }
+      return next;
+    });
   };
 
   // Auto-Fix: Apply Calculated Total to Grand Total
@@ -369,13 +402,19 @@ export function ScreenReview({
 
       {/* CORE SPLIT SCREEN: LEFT PHOTO (Pan & Zoom) vs RIGHT EDITABLE FORM */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LEFT / TOP: Interactive Pan-and-Zoom Bill Viewport */}
+        {/* LEFT / TOP: Interactive Pan-and-Zoom Bill Viewport with Visual Grounding Laser Boxes */}
         <div
           className={`lg:col-span-5 h-[380px] lg:h-[720px] sticky top-20 ${
             mobileView === 'form' ? 'hidden lg:block' : 'block'
           }`}
         >
-          <PanZoomViewer imageUrl={imageUrl} alt={vendorName || 'Supplier Bill'} />
+          <PanZoomViewer
+            imageUrl={imageUrl}
+            alt={vendorName || 'Supplier Bill'}
+            items={items}
+            activeItemIndex={activeItemIndex}
+            onSelectItem={(idx) => setActiveItemIndex(idx)}
+          />
         </div>
 
         {/* RIGHT / BOTTOM: Editable Form */}
@@ -455,6 +494,75 @@ export function ScreenReview({
               </div>
             </div>
           </div>
+
+          {/* LANKA PRICE CREEP & INFLATION RADAR BANNER (Day 2 Magic Moment) */}
+          {priceAnalysis && (
+            <div
+              className={`p-4 rounded-xl border transition-all ${
+                priceAnalysis.increasedCount > 0
+                  ? 'bg-rose-950/30 border-rose-500/50 text-rose-200'
+                  : 'bg-slate-900/90 border-slate-800 text-slate-300'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div
+                    className={`p-2.5 rounded-xl flex-shrink-0 ${
+                      priceAnalysis.increasedCount > 0
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    }`}
+                  >
+                    {priceAnalysis.increasedCount > 0 ? (
+                      <TrendingUp className="w-5 h-5 animate-pulse" />
+                    ) : (
+                      <ShieldAlert className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm text-white">
+                        {priceAnalysis.increasedCount > 0
+                          ? `⚠️ Price Creep Alert: ${priceAnalysis.increasedCount} Item${
+                              priceAnalysis.increasedCount > 1 ? 's' : ''
+                            } Billed at Higher Unit Cost`
+                          : '🛡️ Price Radar Active: Zero Supplier Markups Detected'}
+                      </h4>
+                      {priceAnalysis.increasedCount > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wide">
+                          Supplier Markup
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1">
+                      {priceAnalysis.increasedCount > 0 ? (
+                        <>
+                          Historical ledger comparison shows supplier increased prices. Extra cost on this delivery:{' '}
+                          <b className="font-mono text-rose-300 text-sm">
+                            +Rs. {priceAnalysis.totalPriceHikeImpact.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </b>
+                          {priceAnalysis.highestHikeItem && (
+                            <span className="block sm:inline sm:ml-2 text-rose-400/90 text-[11px]">
+                              (Highest hike: {priceAnalysis.highestHikeItem.name} +{priceAnalysis.highestHikeItem.diffPercentage}%)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        'All items are billed at or below previous purchase levels in your ledger.'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800 self-stretch sm:self-auto justify-between sm:justify-start">
+                  <span>Price History</span>
+                  <span className="text-emerald-400 font-bold">
+                    {priceAnalysis.analyzedItems.filter((i) => i.price_comparison?.status !== 'new').length} Matched
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ARITHMETIC INTEGRITY CHECK BANNER */}
           <div
@@ -581,50 +689,106 @@ export function ScreenReview({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-xs">
-                  {items.map((item) => (
-                    <tr
-                      key={item.id}
-                      className={`transition-colors ${
-                        item.isFlagged
-                          ? 'bg-amber-950/30 hover:bg-amber-950/40'
-                          : 'hover:bg-slate-800/40'
-                      }`}
-                    >
-                      {category === 'Pharmacy' ? (
-                        <>
-                          {/* Product Code */}
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={item.product_code || ''}
-                              onChange={(e) => handleItemChange(item.id!, 'product_code', e.target.value)}
-                              placeholder="Code"
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500 uppercase"
-                            />
-                          </td>
+                  {items.map((item, idx) => {
+                    const comparison = priceAnalysis?.analyzedItems[idx]?.price_comparison;
+                    const isActive = activeItemIndex === idx;
 
-                          {/* Description */}
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
-                              placeholder="Panadol 500mg, Amox 250..."
-                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
-                                item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
-                              }`}
-                            />
-                            {item.is_illegible && (
-                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                                ⚠️ Torn or illegible field detected
-                              </span>
-                            )}
-                            {item.flagReason && !item.is_illegible && (
-                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                                ⚠️ {item.flagReason}
-                              </span>
-                            )}
-                          </td>
+                    return (
+                      <tr
+                        key={item.id || idx}
+                        onClick={() => setActiveItemIndex(idx)}
+                        className={`cursor-pointer transition-all ${
+                          isActive
+                            ? 'bg-emerald-950/40 ring-1 ring-emerald-400'
+                            : item.isFlagged
+                            ? 'bg-amber-950/30 hover:bg-amber-950/40'
+                            : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        {category === 'Pharmacy' ? (
+                          <>
+                            {/* Product Code */}
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.product_code || ''}
+                                onChange={(e) => handleItemChange(item.id!, 'product_code', e.target.value)}
+                                placeholder="Code"
+                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500 uppercase"
+                              />
+                            </td>
+
+                            {/* Description */}
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
+                                placeholder="Panadol 500mg, Amox 250..."
+                                className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
+                                  item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
+                                }`}
+                              />
+                              
+                              {/* Visual Grounding & Price Creep Badges */}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                {item.bounding_box && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveItemIndex(idx);
+                                    }}
+                                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                                      isActive
+                                        ? 'bg-emerald-500 text-white font-bold'
+                                        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900'
+                                    }`}
+                                    title="View on original bill photo"
+                                  >
+                                    <Target className="w-2.5 h-2.5" />
+                                    <span>{isActive ? 'Grounded' : 'Locate'}</span>
+                                  </button>
+                                )}
+
+                                {comparison?.status === 'increased' && (
+                                  <span
+                                    className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
+                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                  >
+                                    <TrendingUp className="w-3 h-3 text-rose-400" />
+                                    <span>+{comparison.diff_percentage}% (+Rs. {comparison.diff_amount})</span>
+                                  </span>
+                                )}
+
+                                {comparison?.status === 'decreased' && (
+                                  <span
+                                    className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
+                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                  >
+                                    <TrendingDown className="w-3 h-3 text-emerald-400" />
+                                    <span>{comparison.diff_percentage}% (-Rs. {Math.abs(comparison.diff_amount)})</span>
+                                  </span>
+                                )}
+
+                                {comparison?.status === 'new' && (
+                                  <span className="text-[10px] text-blue-300/90 bg-blue-950/40 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                                    New SKU
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.is_illegible && (
+                                <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                  ⚠️ Torn or illegible field detected
+                                </span>
+                              )}
+                              {item.flagReason && !item.is_illegible && (
+                                <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                  ⚠️ {item.flagReason}
+                                </span>
+                              )}
+                            </td>
 
                           {/* Batch & Expiry */}
                           <td className="p-2">
@@ -777,6 +941,55 @@ export function ScreenReview({
                                 item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
                               }`}
                             />
+                            
+                            {/* Visual Grounding & Price Creep Badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              {item.bounding_box && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveItemIndex(idx);
+                                  }}
+                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                                    isActive
+                                      ? 'bg-emerald-500 text-white font-bold'
+                                      : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900'
+                                  }`}
+                                  title="View on original bill photo"
+                                >
+                                  <Target className="w-2.5 h-2.5" />
+                                  <span>{isActive ? 'Grounded' : 'Locate'}</span>
+                                </button>
+                              )}
+
+                              {comparison?.status === 'increased' && (
+                                <span
+                                  className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
+                                  title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                >
+                                  <TrendingUp className="w-3 h-3 text-rose-400" />
+                                  <span>+{comparison.diff_percentage}% (+Rs. {comparison.diff_amount})</span>
+                                </span>
+                              )}
+
+                              {comparison?.status === 'decreased' && (
+                                <span
+                                  className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
+                                  title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                >
+                                  <TrendingDown className="w-3 h-3 text-emerald-400" />
+                                  <span>{comparison.diff_percentage}% (-Rs. {Math.abs(comparison.diff_amount)})</span>
+                                </span>
+                              )}
+
+                              {comparison?.status === 'new' && (
+                                <span className="text-[10px] text-blue-300/90 bg-blue-950/40 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                                  New SKU
+                                </span>
+                              )}
+                            </div>
+
                             {item.is_illegible && (
                               <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
                                 ⚠️ Torn or illegible field detected on bill (Null guardrail active)
@@ -863,7 +1076,8 @@ export function ScreenReview({
                         </>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
 
                   {items.length === 0 && (
                     <tr>

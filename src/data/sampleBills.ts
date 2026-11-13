@@ -90,11 +90,11 @@ export const SAMPLE_BILLS: SampleBill[] = [
       invoice_date: '2026-11-04',
       category: 'Hardware',
       items: [
-        { name: 'Tokyo Super Cement (සිමෙන්ති 50kg)', quantity: 20, unit: 'bag', unit_price: 2450.00, total: 49000.00 },
-        { name: '1/2" S-Lon PVC බට Type 400', quantity: 15, unit: 'nos', unit_price: 680.00, total: 10200.00 },
-        { name: 'Weli Cube (River Sand Grade 1)', quantity: 2, unit: 'cube', unit_price: 18500.00, total: 37000.00 },
-        { name: 'Kambi 10mm Tor Steel (යකඩ කම්බි)', quantity: 10, unit: 'bundle', unit_price: 3200.00, total: 32000.00 },
-        { name: 'Wire Nails 2" (ඇණ)', quantity: 5, unit: 'kg', unit_price: 480.00, total: 2400.00 },
+        { name: 'Tokyo Super Cement (සිමෙන්ති 50kg)', quantity: 20, unit: 'bag', unit_price: 2450.00, total: 49000.00, bounding_box: [288, 66, 320, 933] },
+        { name: '1/2" S-Lon PVC බට Type 400', quantity: 15, unit: 'nos', unit_price: 680.00, total: 10200.00, bounding_box: [329, 66, 361, 933] },
+        { name: 'Weli Cube (River Sand Grade 1)', quantity: 2, unit: 'cube', unit_price: 18500.00, total: 37000.00, bounding_box: [370, 66, 402, 933] },
+        { name: 'Kambi 10mm Tor Steel (යකඩ කම්බි)', quantity: 10, unit: 'bundle', unit_price: 3200.00, total: 32000.00, bounding_box: [412, 66, 444, 933] },
+        { name: 'Wire Nails 2" (ඇණ)', quantity: 5, unit: 'kg', unit_price: 480.00, total: 2400.00, bounding_box: [453, 66, 485, 933] },
       ],
       grand_total: 130600.00,
       confidence_notes: 'High confidence. Sinhala Unicode terms (සිමෙන්ති, බට, ඇණ) and Singlish cube units extracted accurately.'
@@ -192,7 +192,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 420.00,
           retail_price: 450.00,
           discount_percent: 0,
-          total: 21000.00
+          total: 21000.00,
+          bounding_box: [268, 58, 300, 942],
         },
         {
           name: 'Amoxicillin 250mg Capsules (10x10)',
@@ -204,7 +205,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 1000.00,
           retail_price: 1200.00,
           discount_percent: 5,
-          total: 28500.00
+          total: 28500.00,
+          bounding_box: [310, 58, 342, 942],
         },
         {
           name: 'Cetirizine 10mg Tablets (Alu-Alu)',
@@ -216,7 +218,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 400.00,
           retail_price: 450.00,
           discount_percent: 5,
-          total: 15200.00
+          total: 15200.00,
+          bounding_box: [352, 58, 384, 942],
         },
         {
           name: 'Betadine Antiseptic Solution 60ml',
@@ -228,7 +231,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 550.00,
           retail_price: 620.00,
           discount_percent: 0,
-          total: 13200.00
+          total: 13200.00,
+          bounding_box: [395, 58, 426, 942],
         },
       ],
       grand_total: 77900.00,
@@ -292,9 +296,9 @@ export const SAMPLE_BILLS: SampleBill[] = [
       invoice_date: '2026-11-06',
       category: 'Hardware',
       items: [
-        { name: 'GI Barbed Wire 12 Gauge (කම්බි රෝල)', quantity: 4, unit: 'roll', unit_price: 7500.00, total: 30000.00 },
-        { name: 'Zinc Corrugated Sheet 8ft (තහඩු)', quantity: 10, unit: 'nos', unit_price: 850.00, total: 10000.00, isFlagged: true, flagReason: 'Math discrepancy: 10 x 850 = 8,500, bill states 10,000' },
-        { name: 'Water Hose 1/2" Heavy Duty', quantity: 2, unit: 'roll', unit_price: 4200.00, total: 8400.00 },
+        { name: 'GI Barbed Wire 12 Gauge (කම්බි රෝල)', quantity: 4, unit: 'roll', unit_price: 7500.00, total: 30000.00, bounding_box: [289, 75, 322, 925] },
+        { name: 'Zinc Corrugated Sheet 8ft (තහඩු)', quantity: 10, unit: 'nos', unit_price: 850.00, total: 10000.00, isFlagged: true, flagReason: 'Math discrepancy: 10 x 850 = 8,500, bill states 10,000', bounding_box: [336, 75, 369, 925] },
+        { name: 'Water Hose 1/2" Heavy Duty', quantity: 2, unit: 'roll', unit_price: 4200.00, total: 8400.00, bounding_box: [383, 75, 416, 925] },
       ],
       grand_total: 48400.00,
       confidence_notes: 'Arithmetic discrepancy detected between line calculation (10 x 850 = 8500) and handwritten line total (10,000).'
@@ -344,8 +348,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
       invoice_date: '2026-11-07',
       category: 'Hardware',
       items: [
-        { name: 'River Sand Grade 1 (වැලි කියුබ්)', quantity: 3, unit: 'cube', unit_price: 19000.00, total: 57000.00 },
-        { name: 'Metal 3/4" (ගල් කියුබ්)', quantity: 2, unit: 'cube', unit_price: null, total: null, is_illegible: true, isFlagged: true, flagReason: 'Torn paper: price and total torn off' },
+        { name: 'River Sand Grade 1 (වැලි කියුබ්)', quantity: 3, unit: 'cube', unit_price: 19000.00, total: 57000.00, bounding_box: [280, 75, 315, 925] },
+        { name: 'Metal 3/4" (ගල් කියුබ්)', quantity: 2, unit: 'cube', unit_price: null, total: null, is_illegible: true, isFlagged: true, flagReason: 'Torn paper: price and total torn off', bounding_box: [335, 75, 370, 925] },
       ],
       grand_total: 89000.00,
       confidence_notes: 'Anti-hallucination guardrail active. Line 2 price torn on physical chit; returned null instead of guessing.'
@@ -412,7 +416,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit: 'pkt',
           unit_price: 2850.00,
           retail_price: 3200.00,
-          total: 11400.00
+          total: 11400.00,
+          bounding_box: [215, 75, 250, 925],
         },
         {
           name: 'Surgical Face Masks 3-Ply',
@@ -423,7 +428,8 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit: 'box',
           unit_price: 720.00,
           retail_price: 850.00,
-          total: 3600.00
+          total: 3600.00,
+          bounding_box: [250, 75, 285, 925],
         },
       ],
       subtotal: 15000.00,
@@ -548,6 +554,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 549.14,
           discount_percent: 8,
           total: 15156.26,
+          bounding_box: [208, 50, 235, 950],
         },
         {
           name: 'Pulmofirst 62.5mg (1x10s)',
@@ -557,6 +564,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 3395.65,
           discount_percent: 8,
           total: 31239.98,
+          bounding_box: [235, 50, 260, 950],
         },
         {
           name: 'Atorem 10mg (10x10s)',
@@ -567,6 +575,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 869.57,
           discount_percent: 8,
           total: 40000.22,
+          bounding_box: [260, 50, 285, 950],
         },
         {
           name: 'Triam Injection',
@@ -576,6 +585,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 834.81,
           discount_percent: 8,
           total: 230407.56,
+          bounding_box: [285, 50, 310, 950],
         },
         {
           name: 'Tolval tablets 15mg (1x4s)',
@@ -585,6 +595,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 1190.13,
           discount_percent: 8,
           total: 54745.98,
+          bounding_box: [310, 50, 335, 950],
         },
         {
           name: 'Cosamide 100mg (1x10s)',
@@ -594,6 +605,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 858.13,
           discount_percent: 8,
           total: 157895.92,
+          bounding_box: [335, 50, 360, 950],
         },
         {
           name: 'Epnone 25mg (3x10s)',
@@ -603,6 +615,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 2321.74,
           discount_percent: 8,
           total: 640800.24,
+          bounding_box: [360, 50, 385, 950],
         },
         {
           name: 'Epnone 50mg (3x10s)',
@@ -613,6 +626,7 @@ export const SAMPLE_BILLS: SampleBill[] = [
           unit_price: 3638.35,
           discount_percent: 8,
           total: 167364.10,
+          bounding_box: [385, 50, 410, 950],
         },
       ],
       subtotal: 1453924.20,

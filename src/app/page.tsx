@@ -40,28 +40,75 @@ export default function Home() {
   const refreshRecords = async () => {
     const list = await getInvoiceRecords();
     
-    // Seed initial records if empty so the user can immediately explore the ledger
+    // Seed initial records if empty so the user can immediately explore the ledger & price history
     if (list.length === 0) {
-      const seeded: InvoiceRecord[] = SAMPLE_BILLS.map((sb, idx) => ({
-        id: `seed-${idx + 1}`,
-        vendor_name: sb.data.vendor_name || 'Vendor',
-        invoice_number: sb.data.invoice_number || 'N/A',
-        invoice_date: sb.data.invoice_date || '2026-11-05',
-        category: sb.data.category,
-        items: sb.data.items,
-        subtotal: sb.data.subtotal,
-        discount: sb.data.discount,
-        tax: sb.data.tax,
-        grand_total: sb.data.grand_total,
-        calculated_total: sb.data.items.reduce((s, it) => s + (Number(it.total) || 0), 0),
-        discrepancy: sb.hasDiscrepancy ? 1500.00 : 0,
-        status: sb.hasDiscrepancy ? 'Flagged' : 'Approved',
-        confidence_notes: sb.data.confidence_notes,
-        image_url: sb.imageUrl,
-        created_at: new Date(Date.now() - idx * 86400000).toISOString(),
-        processing_time_ms: 2200 + idx * 400,
-        sync_status: 'local_only',
-      }));
+      // Historical baseline bills from last week (establishes baseline for Price Creep Radar)
+      const historicalBaselines: InvoiceRecord[] = [
+        {
+          id: 'seed-hist-hardware-prev',
+          vendor_name: 'Nawala Builders & Hardware',
+          invoice_number: 'NBH-2026-810',
+          invoice_date: '2026-10-28',
+          category: 'Hardware',
+          items: [
+            { name: 'Tokyo Super Cement (සිමෙන්ති 50kg)', quantity: 20, unit: 'bag', unit_price: 2200.00, total: 44000.00 },
+            { name: '1/2" S-Lon PVC බට Type 400', quantity: 15, unit: 'nos', unit_price: 680.00, total: 10200.00 },
+            { name: 'Kambi 10mm Tor Steel (යකඩ කම්බි)', quantity: 10, unit: 'bundle', unit_price: 2900.00, total: 29000.00 },
+            { name: 'Wire Nails 2" (ඇණ)', quantity: 5, unit: 'kg', unit_price: 480.00, total: 2400.00 },
+          ],
+          grand_total: 85600.00,
+          calculated_total: 85600.00,
+          discrepancy: 0,
+          status: 'Approved',
+          confidence_notes: 'Historical purchase record from prior delivery.',
+          created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+          processing_time_ms: 1900,
+          sync_status: 'local_only',
+        },
+        {
+          id: 'seed-hist-pharma-prev',
+          vendor_name: 'Western Pharmaceuticals Dist. (Pvt) Ltd',
+          invoice_number: 'WP-INV-98100',
+          invoice_date: '2026-10-25',
+          category: 'Pharmacy',
+          items: [
+            { name: 'Panadol 500mg Tablets (100s box)', product_code: 'MED-101', quantity: 50, unit: 'box', unit_price: 380.00, total: 19000.00 },
+            { name: 'Amoxicillin 250mg Capsules (10x10)', product_code: 'MED-205', quantity: 30, unit: 'pkt', unit_price: 900.00, total: 27000.00 },
+          ],
+          grand_total: 46000.00,
+          calculated_total: 46000.00,
+          discrepancy: 0,
+          status: 'Approved',
+          confidence_notes: 'Historical baseline stock purchase from prior delivery cycle.',
+          created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+          processing_time_ms: 2100,
+          sync_status: 'local_only',
+        },
+      ];
+
+      const seeded: InvoiceRecord[] = [
+        ...historicalBaselines,
+        ...SAMPLE_BILLS.map((sb, idx) => ({
+          id: `seed-${idx + 1}`,
+          vendor_name: sb.data.vendor_name || 'Vendor',
+          invoice_number: sb.data.invoice_number || 'N/A',
+          invoice_date: sb.data.invoice_date || '2026-11-05',
+          category: sb.data.category,
+          items: sb.data.items,
+          subtotal: sb.data.subtotal,
+          discount: sb.data.discount,
+          tax: sb.data.tax,
+          grand_total: sb.data.grand_total,
+          calculated_total: sb.data.items.reduce((s, it) => s + (Number(it.total) || 0), 0),
+          discrepancy: sb.hasDiscrepancy ? 1500.00 : 0,
+          status: sb.hasDiscrepancy ? ('Flagged' as const) : ('Approved' as const),
+          confidence_notes: sb.data.confidence_notes,
+          image_url: sb.imageUrl,
+          created_at: new Date(Date.now() - idx * 86400000).toISOString(),
+          processing_time_ms: 2200 + idx * 400,
+          sync_status: 'local_only' as const,
+        })),
+      ];
 
       for (const rec of seeded) {
         await saveInvoiceRecord(rec);

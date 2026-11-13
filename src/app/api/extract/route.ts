@@ -83,7 +83,11 @@ CRITICAL EXTRACTION GUIDELINES:
    - Determine the most accurate category: "Pharmacy", "Hardware", "General", or "Utilities".
    - If the document contains medicines, drugs, pharmaceutical codes, or hospital supplies, classify as "Pharmacy".
 
-7. Format:
+7. 2D Visual Grounding / Bounding Boxes (Day 2 Magic Moment):
+   - For every extracted line item, return bounding_box as an array of 4 integers [ymin, xmin, ymax, xmax] normalized to a scale of 0 to 1000 representing the rectangular coordinates of that line item row on the image.
+   - Example: [280, 60, 315, 930] means the item begins 28.0% from top, 6.0% from left, ends 31.5% from top, 93.0% from left.
+
+8. Format:
    - Output valid JSON conforming strictly to the requested schema.
 `;
 
@@ -161,10 +165,10 @@ export async function POST(req: NextRequest) {
         invoice_date: new Date().toISOString().split('T')[0],
         category: 'Hardware' as const,
         items: [
-          { name: 'Tokyo Super Portland Cement (සිමෙන්ති 50kg)', quantity: 10, unit: 'bag', unit_price: 2450.00, total: 24500.00 },
-          { name: 'S-Lon 1" PVC Pressure Pipe Type 600', quantity: 6, unit: 'nos', unit_price: 1150.00, total: 6900.00 },
-          { name: 'Weli Cube River Sand Grade 1', quantity: 1, unit: 'cube', unit_price: 18500.00, total: 18500.00 },
-          { name: 'Tor Steel Kambi 12mm', quantity: 8, unit: 'bundle', unit_price: 3600.00, total: 28800.00 },
+          { name: 'Tokyo Super Portland Cement (සිමෙන්ති 50kg)', quantity: 10, unit: 'bag', unit_price: 2450.00, total: 24500.00, bounding_box: [280, 60, 315, 930] },
+          { name: 'S-Lon 1" PVC Pressure Pipe Type 600', quantity: 6, unit: 'nos', unit_price: 1150.00, total: 6900.00, bounding_box: [325, 60, 360, 930] },
+          { name: 'Weli Cube River Sand Grade 1', quantity: 1, unit: 'cube', unit_price: 18500.00, total: 18500.00, bounding_box: [370, 60, 405, 930] },
+          { name: 'Tor Steel Kambi 12mm', quantity: 8, unit: 'bundle', unit_price: 3600.00, total: 28800.00, bounding_box: [415, 60, 450, 930] },
         ],
         grand_total: 78700.00,
         confidence_notes: 'Parsed in Simulated Mode (No GEMINI_API_KEY configured). Add your Google Gemini API key in Settings for live Flash 2.5 vision.'
@@ -228,6 +232,11 @@ export async function POST(req: NextRequest) {
                 discount: { type: Type.NUMBER },
                 total: { type: Type.NUMBER },
                 is_illegible: { type: Type.BOOLEAN },
+                bounding_box: {
+                  type: Type.ARRAY,
+                  items: { type: Type.NUMBER },
+                  description: 'Normalized [ymin, xmin, ymax, xmax] coordinates from 0 to 1000',
+                },
               },
               required: ['name'],
             },
