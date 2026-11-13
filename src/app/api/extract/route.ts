@@ -20,8 +20,26 @@ CRITICAL EXTRACTION GUIDELINES:
      * Extract expiry_date: Expiry date string (e.g., "2027-08", "08/27", "EXP: 11/26").
      * Extract retail_price: Maximum Retail Price (MRP) or consumer retail price if printed separately from wholesale/cost price.
      * Extract unit_price: Distributor wholesale / cost / trade price per unit.
-     * Extract discount_percent: Trade discount percentage (e.g., 5%, 7.5%, 10%) printed on the line or document.
+     * Extract quantity: The actual BILLED / INVOICED quantity charged to the customer (e.g., 30.00, 10.00, 50.00, 300.00).
+     * Extract free_quantity: Free of charge (F.O.C.) / Bonus goods issued with the order (e.g., 25.00 bonus for 50 ordered, or 1 for 10 ordered).
+     * Extract discount_percent: Trade discount percentage (e.g., 8%, 5%, 7.5%, 10%) printed on the line or document.
      * Extract discount: Rupee discount amount deducted from line or subtotal.
+
+   - STRICT RULES FOR PHARMA DOT-MATRIX CONTINUOUS PAPER INVOICES:
+     * Adjacent Column Fusion Prevention (NEVER fuse Disc % or Free Qty into Quantity):
+       Distributor invoices commonly lack vertical column gridlines, placing [QTY], [BONUS / FREE QTY], [DISC %], and [PRICE] closely adjacent.
+       - If an item shows QTY: 30.00 and DISC: 8%, the quantity is 30, NOT 308! NEVER concatenate the 8% discount to the 30 quantity!
+       - If an item shows QTY: 10.00 and BONUS: 1, or DISC: 8%, the quantity is 10, NOT 11!
+       - If an item shows QTY: 300.00 and a 1 bonus or stray dot, the quantity is 300, NOT 301!
+       - If Atorem has 50 billed and 25 bonus, extract Qty: 50, Free Qty: 25 (or two distinct lines with 50 @ price and 25 @ 0.00).
+     * Broken Dot-Matrix Digit Reconstruction (Commercial Batch Standards):
+       Pharmaceutical distribution quantities almost always follow round commercial batch packaging numbers: 10, 20, 25, 30, 40, 50, 100, 200, 250, 300, 500, etc., and standard bonus fractions (e.g. 50+25 = buy 2 get 1 free; 10+1 = 10% bonus).
+       - Broken '5' often drops its top bar or loop and resembles '4' (e.g. 50 read as 49, 25 read as 23). Reconstruct 49 -> 50, 23 -> 25 when in line with pharma packaging standards.
+       - Broken '0' or dot smudge on '300' often resembles '301'. Reconstruct 301 -> 300.
+       - Broken '0' on '10' often resembles '11'. Reconstruct 11 -> 10.
+     * Mathematical Cross-Check Verification:
+       Always cross-verify: Line Net Total = Billed Qty * Unit Price * (1 - Disc % / 100).
+       If Qty = 30 and Disc = 8%, 30 * 549.14 * 0.92 = 15,156.26. That is mathematically congruent with the printed invoice, whereas 308 * 549.14 = 169,135.12 is off by a factor of 10. Use mathematical cross-check to verify the extracted quantity.
 
 3. Packaging Units Normalization (Strict Canonical Standard):
    - Normalize Sri Lankan packaging and volume units to standard lowercase short forms:
@@ -191,6 +209,7 @@ export async function POST(req: NextRequest) {
                 batch_no: { type: Type.STRING },
                 expiry_date: { type: Type.STRING },
                 quantity: { type: Type.NUMBER },
+                free_quantity: { type: Type.NUMBER },
                 unit: { type: Type.STRING },
                 retail_price: { type: Type.NUMBER },
                 unit_price: { type: Type.NUMBER },

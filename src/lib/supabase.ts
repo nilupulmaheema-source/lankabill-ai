@@ -122,6 +122,7 @@ export async function saveInvoiceRecord(record: InvoiceRecord): Promise<{ succes
           batch_no: item.batch_no || null,
           expiry_date: item.expiry_date || null,
           quantity: item.quantity,
+          free_quantity: item.free_quantity || null,
           unit: item.unit || 'nos',
           unit_price: item.unit_price,
           retail_price: item.retail_price || null,
@@ -206,6 +207,7 @@ export async function getInvoiceRecords(): Promise<InvoiceRecord[]> {
         batch_no: it.batch_no || null,
         expiry_date: it.expiry_date || null,
         quantity: it.quantity != null ? Number(it.quantity) : null,
+        free_quantity: it.free_quantity != null ? Number(it.free_quantity) : null,
         unit: it.unit,
         unit_price: it.unit_price != null ? Number(it.unit_price) : null,
         retail_price: it.retail_price != null ? Number(it.retail_price) : null,
@@ -260,7 +262,8 @@ export function exportInvoicesToCsv(invoices: InvoiceRecord[]): void {
     'Item Name',
     'Batch No',
     'Expiry Date',
-    'Qty',
+    'Billed Qty',
+    'Bonus Qty',
     'Unit',
     'Wholesale Price (LKR)',
     'Retail MRP (LKR)',
@@ -288,6 +291,7 @@ export function exportInvoicesToCsv(invoices: InvoiceRecord[]): void {
           `"${(item.batch_no || '').replace(/"/g, '""')}"`,
           `"${(item.expiry_date || '').replace(/"/g, '""')}"`,
           (item.quantity ?? '').toString(),
+          (item.free_quantity ?? '').toString(),
           `"${item.unit || 'nos'}"`,
           item.unit_price != null ? item.unit_price.toFixed(2) : '',
           item.retail_price != null ? item.retail_price.toFixed(2) : '',
@@ -310,6 +314,7 @@ export function exportInvoicesToCsv(invoices: InvoiceRecord[]): void {
         '""',
         '""',
         '""',
+        '0',
         '0',
         '""',
         '0.00',
@@ -339,7 +344,7 @@ export function exportInvoicesToCsv(invoices: InvoiceRecord[]): void {
  * Generate Google Sheets friendly format (TSV) to paste directly into Google Sheets.
  */
 export function generateGoogleSheetsTsv(invoices: InvoiceRecord[]): string {
-  const headers = ['Date', 'Vendor', 'Invoice No', 'Category', 'Code', 'Item Description', 'Batch/Exp', 'Qty', 'Unit', 'Price (Rs.)', 'MRP (Rs.)', 'Disc %', 'Total (Rs.)', 'Bill Grand Total', 'Status'];
+  const headers = ['Date', 'Vendor', 'Invoice No', 'Category', 'Code', 'Item Description', 'Batch/Exp', 'Billed Qty', 'Bonus Qty', 'Unit', 'Price (Rs.)', 'MRP (Rs.)', 'Disc %', 'Total (Rs.)', 'Bill Grand Total', 'Status'];
   const rows: string[] = [headers.join('\t')];
 
   for (const inv of invoices) {
@@ -354,6 +359,7 @@ export function generateGoogleSheetsTsv(invoices: InvoiceRecord[]): string {
           item.name,
           `${item.batch_no || ''}${item.expiry_date ? ` (${item.expiry_date})` : ''}`.trim(),
           (item.quantity ?? '').toString(),
+          (item.free_quantity ?? '').toString(),
           item.unit || 'nos',
           item.unit_price != null ? item.unit_price.toString() : '',
           item.retail_price != null ? item.retail_price.toString() : '',

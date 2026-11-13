@@ -95,6 +95,7 @@ export const InvoiceItemSchema = z.object({
   batch_no: z.string().nullable().optional(),
   expiry_date: z.string().nullable().optional(),
   quantity: z.number().nullable().optional(),
+  free_quantity: z.number().nullable().optional(),
   unit: z.string().default('nos'),
   retail_price: z.number().nullable().optional(),
   unit_price: z.number().nullable().optional(),

@@ -448,7 +448,8 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
                         <th className="p-2.5 text-left w-20">Code</th>
                         <th className="p-2.5 text-left">Description</th>
                         <th className="p-2.5 text-left w-28">Batch / Exp</th>
-                        <th className="p-2.5 text-center w-16">Qty</th>
+                        <th className="p-2.5 text-center w-16">Billed</th>
+                        <th className="p-2.5 text-center w-16 text-teal-400">Bonus</th>
                         <th className="p-2.5 text-right w-20">Wholesale</th>
                         <th className="p-2.5 text-right w-20">MRP</th>
                         <th className="p-2.5 text-right w-14">Disc%</th>
@@ -465,6 +466,9 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
                           </td>
                           <td className="p-2.5 text-center font-mono text-slate-300">
                             {it.quantity != null ? `${it.quantity} ${it.unit || 'nos'}` : <span className="text-amber-400 italic text-[11px]">Torn/Null</span>}
+                          </td>
+                          <td className="p-2.5 text-center font-mono text-teal-400">
+                            {it.free_quantity != null && it.free_quantity > 0 ? it.free_quantity : '-'}
                           </td>
                           <td className="p-2.5 text-right font-mono text-slate-300">
                             {it.unit_price != null ? it.unit_price.toFixed(2) : '-'}

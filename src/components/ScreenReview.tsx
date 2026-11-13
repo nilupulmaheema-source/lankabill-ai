@@ -75,6 +75,7 @@ export function ScreenReview({
       id: it.id || `item-${Date.now()}-${idx}`,
       unit: it.unit || 'nos',
       quantity: it.quantity ?? null,
+      free_quantity: it.free_quantity ?? null,
       unit_price: it.unit_price ?? null,
       total: it.total ?? null,
     }))
@@ -172,6 +173,7 @@ export function ScreenReview({
       batch_no: '',
       expiry_date: '',
       quantity: 1,
+      free_quantity: 0,
       unit: category === 'Pharmacy' ? 'box' : 'nos',
       unit_price: 0,
       retail_price: 0,
@@ -507,15 +509,16 @@ export function ScreenReview({
                   <tr className="bg-slate-950/60 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     {category === 'Pharmacy' ? (
                       <>
-                        <th className="py-2.5 px-2 min-w-[90px] w-24">Item Code</th>
-                        <th className="py-2.5 px-3 min-w-[180px]">Drug / Item Description</th>
-                        <th className="py-2.5 px-2 min-w-[110px] w-28">Batch / Exp</th>
-                        <th className="py-2.5 px-2 w-16 text-center">Qty</th>
-                        <th className="py-2.5 px-2 w-16 text-center">Unit</th>
-                        <th className="py-2.5 px-2 min-w-[95px] text-right">Wholesale (Rs.)</th>
-                        <th className="py-2.5 px-2 min-w-[90px] text-right">MRP (Rs.)</th>
-                        <th className="py-2.5 px-2 w-16 text-right">Disc %</th>
-                        <th className="py-2.5 px-2 min-w-[110px] text-right">Net Total (Rs.)</th>
+                        <th className="py-2.5 px-2 min-w-[85px] w-20">Item Code</th>
+                        <th className="py-2.5 px-3 min-w-[170px]">Drug / Item Description</th>
+                        <th className="py-2.5 px-2 min-w-[100px] w-24">Batch / Exp</th>
+                        <th className="py-2.5 px-2 w-16 text-center">Billed Qty</th>
+                        <th className="py-2.5 px-2 w-16 text-center text-teal-400">Bonus Qty</th>
+                        <th className="py-2.5 px-2 w-14 text-center">Unit</th>
+                        <th className="py-2.5 px-2 min-w-[90px] text-right">Wholesale (Rs.)</th>
+                        <th className="py-2.5 px-2 min-w-[85px] text-right">MRP (Rs.)</th>
+                        <th className="py-2.5 px-2 w-14 text-right">Disc %</th>
+                        <th className="py-2.5 px-2 min-w-[105px] text-right">Net Total (Rs.)</th>
                         <th className="py-2.5 px-2 w-8 text-center"></th>
                       </>
                     ) : (
@@ -596,7 +599,7 @@ export function ScreenReview({
                             </div>
                           </td>
 
-                          {/* Qty */}
+                          {/* Billed Qty */}
                           <td className="p-2 text-center">
                             <input
                               type="number"
@@ -608,6 +611,22 @@ export function ScreenReview({
                                 handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
                               }}
                               className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Bonus / Free Qty */}
+                          <td className="p-2 text-center">
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.free_quantity ?? ''}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'free_quantity', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-teal-500/40 rounded px-1.5 py-1.5 text-center text-teal-300 font-mono focus:outline-none focus:border-teal-400"
+                              title="Free Issue / Bonus stock (F.O.C.)"
                             />
                           </td>
 
@@ -801,7 +820,7 @@ export function ScreenReview({
 
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={category === 'Pharmacy' ? 10 : 6} className="text-center py-8 text-slate-400 text-xs">
+                      <td colSpan={category === 'Pharmacy' ? 11 : 6} className="text-center py-8 text-slate-400 text-xs">
                         No line items found. Click "Add Row" to enter items manually.
                       </td>
                     </tr>
