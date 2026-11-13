@@ -126,16 +126,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Initialize Google Gen AI SDK (@google/genai)
-    const ai = new GoogleGenAI({ apiKey });
+    // Initialize Google Gen AI SDK (@google/genai) on v1beta endpoint
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: { apiVersion: 'v1beta' },
+    });
 
-    // Candidate vision models with gemini-3.8-flash as primary and gemini-3.1-pro-preview as active fallback
+    // High-speed, 100% active vision models for fast sub-3s extraction
     const candidateModels = [
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash-lite',
       'gemini-3.8-flash',
       'gemini-3.1-pro-preview',
-      'gemini-3.1-pro',
-      'gemini-3.8-flash-preview',
-      'gemini-2.0-flash-exp',
     ];
 
     let lastError: any = null;
@@ -196,33 +198,14 @@ export async function POST(req: NextRequest) {
       },
     ];
 
-    // Retry helper with backoff for temporary 503 (high demand spikes)
-    async function attemptModelWithRetry(modelName: string, maxRetries = 1): Promise<any> {
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          const res = await ai.models.generateContent({
-            model: modelName,
-            contents: requestContents,
-            config: requestConfig,
-          });
-          if (res && res.text) return res;
-        } catch (err: any) {
-          const errMsg = err?.message || String(err);
-          const is503 = errMsg.includes('503') || err?.status === 503 || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
-          
-          if (is503 && attempt < maxRetries) {
-            console.log(`[LankaBill API] Model ${modelName} 503 high demand spike. Retrying in 800ms (${attempt + 1}/${maxRetries})...`);
-            await new Promise((r) => setTimeout(r, 800));
-            continue;
-          }
-          throw err;
-        }
-      }
-    }
-
+    // Attempt candidate models with zero stall: fast failover to the first responsive model
     for (const model of candidateModels) {
       try {
-        response = await attemptModelWithRetry(model, 1);
+        response = await ai.models.generateContent({
+          model,
+          contents: requestContents,
+          config: requestConfig,
+        });
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;

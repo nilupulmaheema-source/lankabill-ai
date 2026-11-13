@@ -40,7 +40,7 @@ export function Header({
                   LankaBill
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                  Flash 3.8
+                  Flash 3.5
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
