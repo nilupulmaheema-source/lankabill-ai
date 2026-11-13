@@ -3,30 +3,41 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { InvoiceExtractionSchema } from '@/types/invoice';
 import { SAMPLE_BILLS } from '@/data/sampleBills';
 
-// System prompt tailored for Sri Lankan retail bills (Day 1 Benchmark & Calibration)
+// System prompt tailored for Sri Lankan retail bills & pharma distribution (Day 1 Benchmark & Calibration)
 const SRI_LANKA_BILL_SYSTEM_PROMPT = `
 You are an expert high-speed Optical Document & Invoice AI specializing in Sri Lankan retail and distribution bills.
-Your job is to accurately extract supplier invoices, Goods Received Notes (GRN), delivery notes, and counter cash chits from Sri Lankan merchants (pharmacies, hardware stores, grocery distributors, and building material yards).
+Your job is to accurately extract supplier invoices, Goods Received Notes (GRN), delivery notes, and counter cash chits from Sri Lankan merchants (pharmacies, pharmaceutical distributors, hardware stores, grocery distributors, and building material yards).
 
 CRITICAL EXTRACTION GUIDELINES:
 1. Language & Script:
    - Invoices frequently contain English, Sinhala Unicode (e.g., සිමෙන්ති, බට, ඇණ, තහඩු, කම්බි, තෙල්, වැලි), or Singlish (e.g., weli cube, kambi 10mm, takaran, s-lon pvc, boralu, gala).
    - Accurately preserve the exact item names in Sinhala or Singlish where written. Never translate Sinhala item names to English if written in Sinhala.
 
-2. Packaging Units Normalization (Strict Canonical Standard):
+2. Sri Lankan Pharmaceutical Distribution & Retail Invoices:
+   - For Pharmacy & Medical distribution documents (e.g., invoices, GRNs, delivery orders from Hemas, Emerchemie, Sunshine Healthcare, Baurs, George Steuart, Morison, SPC, JL Morison, Astron, Swiss Biogenics, etc.):
+     * Extract product_code: Item/SKU/Product code often printed in the first column (e.g., "MED-1029", "800451", "AMP01", "PC-500").
+     * Extract batch_no: Batch or Lot number (e.g., "GS881", "B#24019", "LOT-992").
+     * Extract expiry_date: Expiry date string (e.g., "2027-08", "08/27", "EXP: 11/26").
+     * Extract retail_price: Maximum Retail Price (MRP) or consumer retail price if printed separately from wholesale/cost price.
+     * Extract unit_price: Distributor wholesale / cost / trade price per unit.
+     * Extract discount_percent: Trade discount percentage (e.g., 5%, 7.5%, 10%) printed on the line or document.
+     * Extract discount: Rupee discount amount deducted from line or subtotal.
+
+3. Packaging Units Normalization (Strict Canonical Standard):
    - Normalize Sri Lankan packaging and volume units to standard lowercase short forms:
+     * Pharma & Medical: "strip" (tablets/capsule strips), "tab" (individual tablets/පෙති), "cap" (capsules), "amp" (ampoules), "vial", "tube", "box", "btl" (bottles), "pkt" (packets), "tin", "nos".
      * Hardware: "cube" (for sand/soil/aggregate - කුබ්බ/ක්යුබ්), "bag" (for cement/lime), "bundle" (for tor steel/rebar - බන්ඩල්), "nos" (for pipes/fittings/pieces - ගෙඩි/කෑලි/pcs/numbers), "kg" (for nails/wire), "roll" (for barbed wire/chainlink), "sheet" (for asbestos/zinc takaran), "sqft" (for tiles/granite).
-     * Pharma & Medical: "pkt" (packets), "strip" (tablets/capsule strips), "box", "btl" (bottles), "tin", "tab" (individual tablets/පෙති), "cap" (capsules).
      * General Retail: "kg", "g", "l", "ml", "mtr", "nos", "pkt".
 
-3. Numerical & Arithmetic Accuracy & Anti-Hallucination:
+4. Numerical & Arithmetic Accuracy & Anti-Hallucination:
    - Extract exact unit price (in LKR - Sri Lankan Rupees) and quantities.
    - If line total is printed, extract it as is.
+   - Line Total Calculation in Pharma Distribution: Total is typically Qty * Unit Price * (1 - Trade Discount % / 100).
    - Extract subtotal, trade discount (if present, e.g. 5% pharma discount), and tax (VAT/SSCL) if printed.
    - Extract the printed Grand Total.
    - ANTI-HALLUCINATION GUARDRAIL: If handwriting or numeric values are torn off, smudged, cut off, or completely illegible, set quantity/unit_price/total to null and set is_illegible to true. NEVER fabricate or guess numbers.
 
-4. Broken, Faint, and Half-Written English/Numeric Character Reconstruction:
+5. Broken, Faint, and Half-Written English/Numeric Character Reconstruction:
    - Physical bills in Sri Lanka frequently suffer from:
      * Dot-matrix pin drops (e.g. missing pin lines making "E" look like "F" or "L", "B" look like "13" or "8", "D" look like "O", "P" look like "I:").
      * Faint carbon copy bleed-through (only partial pen pressure transferring).
@@ -39,10 +50,11 @@ CRITICAL EXTRACTION GUIDELINES:
        - In Description columns: Distinguish letters based on Sri Lankan brand names and product catalogs.
      * Mathematical Cross-Deduction: If one digit in a price or quantity is half-written or broken, use the arithmetic relation (Quantity * Unit Price = Total) to mathematically reconstruct the missing stroke with certainty.
 
-5. Category Classification:
+6. Category Classification:
    - Determine the most accurate category: "Pharmacy", "Hardware", "General", or "Utilities".
+   - If the document contains medicines, drugs, pharmaceutical codes, or hospital supplies, classify as "Pharmacy".
 
-6. Format:
+7. Format:
    - Output valid JSON conforming strictly to the requested schema.
 `;
 
@@ -175,9 +187,15 @@ export async function POST(req: NextRequest) {
               type: Type.OBJECT,
               properties: {
                 name: { type: Type.STRING },
+                product_code: { type: Type.STRING },
+                batch_no: { type: Type.STRING },
+                expiry_date: { type: Type.STRING },
                 quantity: { type: Type.NUMBER },
                 unit: { type: Type.STRING },
+                retail_price: { type: Type.NUMBER },
                 unit_price: { type: Type.NUMBER },
+                discount_percent: { type: Type.NUMBER },
+                discount: { type: Type.NUMBER },
                 total: { type: Type.NUMBER },
                 is_illegible: { type: Type.BOOLEAN },
               },

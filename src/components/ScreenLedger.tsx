@@ -439,33 +439,77 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
               </div>
 
               {/* Items List */}
-              <div className="border border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px]">
-                    <tr>
-                      <th className="p-2.5 text-left">Item Description</th>
-                      <th className="p-2.5 text-center">Qty</th>
-                      <th className="p-2.5 text-right">Price (Rs.)</th>
-                      <th className="p-2.5 text-right">Total (Rs.)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {activeModalRecord.items?.map((it, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="p-2.5 text-slate-100 font-medium">{it.name}</td>
-                        <td className="p-2.5 text-center font-mono text-slate-300">
-                          {it.quantity != null ? `${it.quantity} ${it.unit || 'nos'}` : <span className="text-amber-400 italic text-[11px]">Torn/Null</span>}
-                        </td>
-                        <td className="p-2.5 text-right font-mono text-slate-300">
-                          {it.unit_price != null ? it.unit_price.toFixed(2) : '-'}
-                        </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
-                          {it.total != null ? it.total.toFixed(2) : <span className="text-amber-400 text-xs">Unspecified</span>}
-                        </td>
+              <div className="border border-slate-800 rounded-xl overflow-hidden overflow-x-auto">
+                {activeModalRecord.category === 'Pharmacy' ||
+                activeModalRecord.items?.some((it) => it.product_code || it.batch_no || it.discount_percent) ? (
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px]">
+                      <tr>
+                        <th className="p-2.5 text-left w-20">Code</th>
+                        <th className="p-2.5 text-left">Description</th>
+                        <th className="p-2.5 text-left w-28">Batch / Exp</th>
+                        <th className="p-2.5 text-center w-16">Qty</th>
+                        <th className="p-2.5 text-right w-20">Wholesale</th>
+                        <th className="p-2.5 text-right w-20">MRP</th>
+                        <th className="p-2.5 text-right w-14">Disc%</th>
+                        <th className="p-2.5 text-right w-24">Net Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {activeModalRecord.items?.map((it, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/30">
+                          <td className="p-2.5 font-mono text-[11px] text-teal-400">{it.product_code || '-'}</td>
+                          <td className="p-2.5 text-slate-100 font-medium">{it.name}</td>
+                          <td className="p-2.5 font-mono text-[11px] text-slate-400">
+                            {it.batch_no || '-'}{it.expiry_date ? ` (${it.expiry_date})` : ''}
+                          </td>
+                          <td className="p-2.5 text-center font-mono text-slate-300">
+                            {it.quantity != null ? `${it.quantity} ${it.unit || 'nos'}` : <span className="text-amber-400 italic text-[11px]">Torn/Null</span>}
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-slate-300">
+                            {it.unit_price != null ? it.unit_price.toFixed(2) : '-'}
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-slate-400 text-[11px]">
+                            {it.retail_price != null ? it.retail_price.toFixed(2) : '-'}
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-teal-400">
+                            {it.discount_percent != null && it.discount_percent > 0 ? `${it.discount_percent}%` : '-'}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
+                            {it.total != null ? it.total.toFixed(2) : <span className="text-amber-400 text-xs">Unspecified</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px]">
+                      <tr>
+                        <th className="p-2.5 text-left">Item Description</th>
+                        <th className="p-2.5 text-center">Qty</th>
+                        <th className="p-2.5 text-right">Price (Rs.)</th>
+                        <th className="p-2.5 text-right">Total (Rs.)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {activeModalRecord.items?.map((it, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/30">
+                          <td className="p-2.5 text-slate-100 font-medium">{it.name}</td>
+                          <td className="p-2.5 text-center font-mono text-slate-300">
+                            {it.quantity != null ? `${it.quantity} ${it.unit || 'nos'}` : <span className="text-amber-400 italic text-[11px]">Torn/Null</span>}
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-slate-300">
+                            {it.unit_price != null ? it.unit_price.toFixed(2) : '-'}
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
+                            {it.total != null ? it.total.toFixed(2) : <span className="text-amber-400 text-xs">Unspecified</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {/* Confidence Notes */}

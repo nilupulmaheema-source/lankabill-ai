@@ -107,12 +107,30 @@ export function ScreenReview({
 
         const updated = { ...item, [field]: value };
 
-        // Auto-recalculate line total if quantity or unit_price was modified
-        if (field === 'quantity' || field === 'unit_price') {
-          const qty = field === 'quantity' ? (value === '' || value === null ? null : Number(value)) : item.quantity;
-          const price = field === 'unit_price' ? (value === '' || value === null ? null : Number(value)) : item.unit_price;
+        // Auto-recalculate line total if quantity, unit_price, retail_price, or discount_percent was modified
+        if (
+          field === 'quantity' ||
+          field === 'unit_price' ||
+          field === 'retail_price' ||
+          field === 'discount_percent' ||
+          field === 'discount'
+        ) {
+          const qty = field === 'quantity' ? (value === '' || value === null ? null : Number(value)) : updated.quantity;
+          const price = field === 'unit_price' ? (value === '' || value === null ? null : Number(value)) : updated.unit_price;
+          const discPct = field === 'discount_percent' ? (value === '' || value === null ? null : Number(value)) : updated.discount_percent;
+          const discAmt = field === 'discount' ? (value === '' || value === null ? null : Number(value)) : updated.discount;
+
           if (qty != null && price != null) {
-            updated.total = Math.round(qty * price * 100) / 100;
+            const rawLine = qty * price;
+            let netLine = rawLine;
+
+            if (discPct != null && Number(discPct) > 0) {
+              netLine = rawLine * (1 - Number(discPct) / 100);
+            } else if (discAmt != null && Number(discAmt) > 0) {
+              netLine = rawLine - Number(discAmt);
+            }
+
+            updated.total = Math.round(netLine * 100) / 100;
             updated.is_illegible = false;
           }
         }
@@ -122,10 +140,18 @@ export function ScreenReview({
           updated.isFlagged = true;
           updated.flagReason = 'Missing or illegible figure on bill';
         } else {
-          const lineExpected = Math.round(Number(updated.quantity) * Number(updated.unit_price) * 100) / 100;
+          const rawLine = Number(updated.quantity) * Number(updated.unit_price);
+          let lineExpected = rawLine;
+          if (updated.discount_percent != null && Number(updated.discount_percent) > 0) {
+            lineExpected = rawLine * (1 - Number(updated.discount_percent) / 100);
+          } else if (updated.discount != null && Number(updated.discount) > 0) {
+            lineExpected = rawLine - Number(updated.discount);
+          }
+          lineExpected = Math.round(lineExpected * 100) / 100;
+
           if (Math.abs(lineExpected - Number(updated.total)) > 1.0) {
             updated.isFlagged = true;
-            updated.flagReason = `Diff: ${updated.quantity} × Rs. ${updated.unit_price} = Rs. ${lineExpected.toFixed(2)}`;
+            updated.flagReason = `Diff: Expected Rs. ${lineExpected.toFixed(2)} (Qty: ${updated.quantity}, Rate: ${updated.unit_price}${updated.discount_percent ? `, Disc: ${updated.discount_percent}%` : ''})`;
           } else {
             updated.isFlagged = false;
             updated.flagReason = undefined;
@@ -142,9 +168,14 @@ export function ScreenReview({
     const newItem: InvoiceItem = {
       id: `item-${Date.now()}`,
       name: '',
+      product_code: '',
+      batch_no: '',
+      expiry_date: '',
       quantity: 1,
-      unit: 'nos',
+      unit: category === 'Pharmacy' ? 'box' : 'nos',
       unit_price: 0,
+      retail_price: 0,
+      discount_percent: 0,
       total: 0,
     };
     setItems((prev) => [...prev, newItem]);
@@ -160,14 +191,21 @@ export function ScreenReview({
     setGrandTotalInput(Math.round(calculatedTotal * 100) / 100);
   };
 
-  // Recalculate all row totals based on qty * unit_price
+  // Recalculate all row totals based on qty * unit_price (with discounts accounted for)
   const handleRecalculateAllRows = () => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.quantity != null && it.unit_price != null) {
+          const rawLine = Number(it.quantity) * Number(it.unit_price);
+          let netLine = rawLine;
+          if (it.discount_percent != null && Number(it.discount_percent) > 0) {
+            netLine = rawLine * (1 - Number(it.discount_percent) / 100);
+          } else if (it.discount != null && Number(it.discount) > 0) {
+            netLine = rawLine - Number(it.discount);
+          }
           return {
             ...it,
-            total: Math.round(Number(it.quantity) * Number(it.unit_price) * 100) / 100,
+            total: Math.round(netLine * 100) / 100,
             isFlagged: false,
             flagReason: undefined,
           };
@@ -439,12 +477,18 @@ export function ScreenReview({
 
           {/* LINE ITEMS TABLE (EDITABLE) */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            {/* Table Header Controls */}
+            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Calculator className="w-4 h-4 text-emerald-400" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
                   Itemized Line Items ({items.length})
                 </h3>
+                {category === 'Pharmacy' && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                    Pharma Distribution Mode
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -461,16 +505,33 @@ export function ScreenReview({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-950/60 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                    <th className="py-2.5 px-3 min-w-[180px]">Item Description</th>
-                    <th className="py-2.5 px-2 w-20 text-center">Qty</th>
-                    <th className="py-2.5 px-2 w-20">Unit</th>
-                    <th className="py-2.5 px-2 min-w-[110px] text-right">Unit Price (LKR)</th>
-                    <th className="py-2.5 px-2 min-w-[120px] text-right">Total (LKR)</th>
-                    <th className="py-2.5 px-2 w-10 text-center"></th>
+                    {category === 'Pharmacy' ? (
+                      <>
+                        <th className="py-2.5 px-2 min-w-[90px] w-24">Item Code</th>
+                        <th className="py-2.5 px-3 min-w-[180px]">Drug / Item Description</th>
+                        <th className="py-2.5 px-2 min-w-[110px] w-28">Batch / Exp</th>
+                        <th className="py-2.5 px-2 w-16 text-center">Qty</th>
+                        <th className="py-2.5 px-2 w-16 text-center">Unit</th>
+                        <th className="py-2.5 px-2 min-w-[95px] text-right">Wholesale (Rs.)</th>
+                        <th className="py-2.5 px-2 min-w-[90px] text-right">MRP (Rs.)</th>
+                        <th className="py-2.5 px-2 w-16 text-right">Disc %</th>
+                        <th className="py-2.5 px-2 min-w-[110px] text-right">Net Total (Rs.)</th>
+                        <th className="py-2.5 px-2 w-8 text-center"></th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-2.5 px-3 min-w-[180px]">Item Description</th>
+                        <th className="py-2.5 px-2 w-20 text-center">Qty</th>
+                        <th className="py-2.5 px-2 w-20">Unit</th>
+                        <th className="py-2.5 px-2 min-w-[110px] text-right">Unit Price (LKR)</th>
+                        <th className="py-2.5 px-2 min-w-[120px] text-right">Total (LKR)</th>
+                        <th className="py-2.5 px-2 w-10 text-center"></th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-xs">
-                  {items.map((item, idx) => (
+                  {items.map((item) => (
                     <tr
                       key={item.id}
                       className={`transition-colors ${
@@ -479,106 +540,268 @@ export function ScreenReview({
                           : 'hover:bg-slate-800/40'
                       }`}
                     >
-                      {/* Description */}
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
-                          placeholder="Item name (සිමෙන්ති / Amox / Cable)"
-                          className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
-                            item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
-                          }`}
-                        />
-                        {item.is_illegible && (
-                          <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                            ⚠️ Torn or illegible field detected on bill (Null guardrail active)
-                          </span>
-                        )}
-                        {item.flagReason && !item.is_illegible && (
-                          <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                            ⚠️ {item.flagReason}
-                          </span>
-                        )}
-                      </td>
+                      {category === 'Pharmacy' ? (
+                        <>
+                          {/* Product Code */}
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={item.product_code || ''}
+                              onChange={(e) => handleItemChange(item.id!, 'product_code', e.target.value)}
+                              placeholder="Code"
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500 uppercase"
+                            />
+                          </td>
 
-                      {/* Qty */}
-                      <td className="p-2 text-center">
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.quantity ?? ''}
-                          placeholder="-"
-                          onChange={(e) => {
-                            const val = e.target.value.trim();
-                            handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
-                          }}
-                          className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                        />
-                      </td>
+                          {/* Description */}
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
+                              placeholder="Panadol 500mg, Amox 250..."
+                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
+                                item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
+                              }`}
+                            />
+                            {item.is_illegible && (
+                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                ⚠️ Torn or illegible field detected
+                              </span>
+                            )}
+                            {item.flagReason && !item.is_illegible && (
+                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                ⚠️ {item.flagReason}
+                              </span>
+                            )}
+                          </td>
 
-                      {/* Unit */}
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={item.unit || 'nos'}
-                          onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
-                          placeholder="nos/pkt/cube"
-                          className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-300 text-xs font-mono focus:outline-none focus:border-emerald-500"
-                        />
-                      </td>
+                          {/* Batch & Expiry */}
+                          <td className="p-2">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={item.batch_no || ''}
+                                onChange={(e) => handleItemChange(item.id!, 'batch_no', e.target.value)}
+                                placeholder="B.No (e.g. GS881)"
+                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-300 font-mono focus:outline-none focus:border-emerald-500"
+                              />
+                              <input
+                                type="text"
+                                value={item.expiry_date || ''}
+                                onChange={(e) => handleItemChange(item.id!, 'expiry_date', e.target.value)}
+                                placeholder="Exp (MM/YY)"
+                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-400 font-mono focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </td>
 
-                      {/* Unit Price */}
-                      <td className="p-2 text-right">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.unit_price ?? ''}
-                          placeholder="-"
-                          onChange={(e) => {
-                            const val = e.target.value.trim();
-                            handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
-                          }}
-                          className="w-full bg-slate-950/80 border border-slate-700 rounded px-2.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                        />
-                      </td>
+                          {/* Qty */}
+                          <td className="p-2 text-center">
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.quantity ?? ''}
+                              placeholder="-"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
 
-                      {/* Total */}
-                      <td className="p-2 text-right">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.total ?? ''}
-                          placeholder="-"
-                          onChange={(e) => {
-                            const val = e.target.value.trim();
-                            handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
-                          }}
-                          className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
-                            item.isFlagged
-                              ? 'border-amber-500 text-amber-300 bg-amber-950/40'
-                              : 'border-slate-700 text-emerald-400'
-                          }`}
-                        />
-                      </td>
+                          {/* Unit */}
+                          <td className="p-2 text-center">
+                            <input
+                              type="text"
+                              value={item.unit || 'box'}
+                              onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
+                              placeholder="strip/box"
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1 py-1.5 text-center text-slate-300 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
 
-                      {/* Action Delete */}
-                      <td className="p-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRow(item.id!)}
-                          className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
-                          title="Delete Row"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+                          {/* Trade / Cost Unit Price */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.unit_price ?? ''}
+                              placeholder="Cost"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Retail / MRP Price */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.retail_price ?? ''}
+                              placeholder="MRP"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'retail_price', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-right text-slate-300 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Trade Discount % */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={item.discount_percent ?? ''}
+                              placeholder="0%"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'discount_percent', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1 py-1.5 text-right text-teal-300 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Net Total */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.total ?? ''}
+                              placeholder="-"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
+                              }}
+                              className={`w-full bg-slate-950/80 border rounded px-1.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
+                                item.isFlagged
+                                  ? 'border-amber-500 text-amber-300 bg-amber-950/40'
+                                  : 'border-slate-700 text-emerald-400'
+                              }`}
+                            />
+                          </td>
+
+                          {/* Action Delete */}
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(item.id!)}
+                              className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
+                              title="Delete Row"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {/* Standard Description */}
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
+                              placeholder="Item name (සිමෙන්ති / Cable / Pipe)"
+                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
+                                item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
+                              }`}
+                            />
+                            {item.is_illegible && (
+                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                ⚠️ Torn or illegible field detected on bill (Null guardrail active)
+                              </span>
+                            )}
+                            {item.flagReason && !item.is_illegible && (
+                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                ⚠️ {item.flagReason}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Standard Qty */}
+                          <td className="p-2 text-center">
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.quantity ?? ''}
+                              placeholder="-"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Standard Unit */}
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={item.unit || 'nos'}
+                              onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
+                              placeholder="nos/pkt/cube"
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-300 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Standard Unit Price */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.unit_price ?? ''}
+                              placeholder="-"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
+                              }}
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </td>
+
+                          {/* Standard Total */}
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.total ?? ''}
+                              placeholder="-"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
+                              }}
+                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
+                                item.isFlagged
+                                  ? 'border-amber-500 text-amber-300 bg-amber-950/40'
+                                  : 'border-slate-700 text-emerald-400'
+                              }`}
+                            />
+                          </td>
+
+                          {/* Action Delete */}
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(item.id!)}
+                              className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
+                              title="Delete Row"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
 
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400 text-xs">
+                      <td colSpan={category === 'Pharmacy' ? 10 : 6} className="text-center py-8 text-slate-400 text-xs">
                         No line items found. Click "Add Row" to enter items manually.
                       </td>
                     </tr>

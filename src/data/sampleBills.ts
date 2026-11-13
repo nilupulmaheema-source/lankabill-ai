@@ -104,60 +104,76 @@ export const SAMPLE_BILLS: SampleBill[] = [
     id: 'sample-pharma-2',
     title: 'Western Pharmaceuticals Dist. (GRN)',
     category: 'Pharmacy',
-    description: 'Pharmaceutical Delivery Note with batch numbers, blister strips, and unit pricing.',
+    description: 'Pharmaceutical Delivery Note / GRN with product codes, batch numbers, expiry dates, retail MRP, and trade discount.',
     imageUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="850" viewBox="0 0 600 850" style="background:#ffffff; font-family:sans-serif; color:#0f172a;">
         <rect width="600" height="850" fill="#ffffff"/>
         <rect x="25" y="25" width="550" height="800" fill="none" stroke="#e2e8f0" stroke-width="2"/>
         <rect x="25" y="25" width="550" height="15" fill="#0d9488"/>
-        <text x="45" y="75" font-size="22" font-weight="bold" fill="#0f766e">WESTERN PHARMACEUTICAL DISTRIBUTORS (PVT) LTD</text>
-        <text x="45" y="98" font-size="12" fill="#475569">45 Galle Road, Colombo 03 | NMRA Reg: WD-4029 | Tel: 011-2559100</text>
-        <text x="45" y="125" font-size="14" font-weight="bold" fill="#1e293b">GOODS RECEIVED NOTE (GRN) / TAX INVOICE</text>
-        <line x1="45" y1="135" x2="555" y2="135" stroke="#cbd5e1" stroke-width="1"/>
-        <text x="45" y="160" font-size="12"><b>Customer:</b> Royal Care Pharmacy</text>
-        <text x="45" y="180" font-size="12"><b>Invoice No:</b> WP-INV-99420</text>
-        <text x="380" y="160" font-size="12"><b>Date:</b> 2026-11-05</text>
-        <text x="380" y="180" font-size="12"><b>Payment Terms:</b> 30 Days Credit</text>
-        <rect x="45" y="200" width="510" height="28" fill="#f0fdfa"/>
-        <text x="55" y="218" font-size="11" font-weight="bold" fill="#0f766e">ITEM DESCRIPTION</text>
-        <text x="280" y="218" font-size="11" font-weight="bold" fill="#0f766e">BATCH</text>
-        <text x="345" y="218" font-size="11" font-weight="bold" fill="#0f766e">QTY / UNIT</text>
-        <text x="425" y="218" font-size="11" font-weight="bold" fill="#0f766e">PRICE (LKR)</text>
-        <text x="500" y="218" font-size="11" font-weight="bold" fill="#0f766e">TOTAL</text>
-        <line x1="45" y1="230" x2="555" y2="230" stroke="#0d9488" stroke-width="1"/>
+        <text x="45" y="75" font-size="20" font-weight="bold" fill="#0f766e">WESTERN PHARMACEUTICAL DISTRIBUTORS (PVT) LTD</text>
+        <text x="45" y="96" font-size="11" fill="#475569">45 Galle Road, Colombo 03 | NMRA Reg: WD-4029 | Tel: 011-2559100</text>
+        <text x="45" y="120" font-size="13" font-weight="bold" fill="#1e293b">PHARMA GOODS RECEIVED NOTE (GRN) / TAX INVOICE</text>
+        <line x1="45" y1="130" x2="555" y2="130" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="45" y="152" font-size="11"><b>Customer:</b> Royal Care Pharmacy</text>
+        <text x="45" y="170" font-size="11"><b>Invoice No:</b> WP-INV-99420</text>
+        <text x="360" y="152" font-size="11"><b>Date:</b> 2026-11-05</text>
+        <text x="360" y="170" font-size="11"><b>Payment Terms:</b> 30 Days Credit</text>
+        
+        <rect x="35" y="188" width="530" height="26" fill="#f0fdfa"/>
+        <text x="42" y="205" font-size="10" font-weight="bold" fill="#0f766e">CODE</text>
+        <text x="95" y="205" font-size="10" font-weight="bold" fill="#0f766e">ITEM DESCRIPTION</text>
+        <text x="260" y="205" font-size="10" font-weight="bold" fill="#0f766e">BATCH / EXP</text>
+        <text x="345" y="205" font-size="10" font-weight="bold" fill="#0f766e">QTY</text>
+        <text x="390" y="205" font-size="10" font-weight="bold" fill="#0f766e">W/SALE</text>
+        <text x="450" y="205" font-size="10" font-weight="bold" fill="#0f766e">MRP</text>
+        <text x="495" y="205" font-size="10" font-weight="bold" fill="#0f766e">DISC%</text>
+        <text x="535" y="205" font-size="10" font-weight="bold" fill="#0f766e">TOTAL</text>
+        <line x1="35" y1="216" x2="565" y2="216" stroke="#0d9488" stroke-width="1"/>
 
-        <text x="55" y="255" font-size="12">Panadol 500mg Tablets (100s box)</text>
-        <text x="280" y="255" font-size="11" fill="#64748b">B#GS881</text>
-        <text x="345" y="255" font-size="12">50 box</text>
-        <text x="425" y="255" font-size="12">420.00</text>
-        <text x="500" y="255" font-size="12">21,000.00</text>
+        <text x="42" y="242" font-size="11" font-family="monospace">MED-101</text>
+        <text x="95" y="242" font-size="11">Panadol 500mg Tab (100s)</text>
+        <text x="260" y="242" font-size="10" fill="#64748b">GS881 (04/28)</text>
+        <text x="345" y="242" font-size="11">50 box</text>
+        <text x="390" y="242" font-size="11">420.00</text>
+        <text x="450" y="242" font-size="10" fill="#64748b">450.00</text>
+        <text x="500" y="242" font-size="11">0%</text>
+        <text x="560" y="242" font-size="11" text-anchor="end">21,000.00</text>
 
-        <text x="55" y="290" font-size="12">Amoxicillin 250mg Capsules (10x10)</text>
-        <text x="280" y="290" font-size="11" fill="#64748b">B#AM201</text>
-        <text x="345" y="290" font-size="12">30 pkt</text>
-        <text x="425" y="290" font-size="12">950.00</text>
-        <text x="500" y="290" font-size="12">28,500.00</text>
+        <text x="42" y="278" font-size="11" font-family="monospace">MED-205</text>
+        <text x="95" y="278" font-size="11">Amoxicillin 250mg Cap (10x10)</text>
+        <text x="260" y="278" font-size="10" fill="#64748b">AM201 (11/27)</text>
+        <text x="345" y="278" font-size="11">30 pkt</text>
+        <text x="390" y="278" font-size="11">1,000.00</text>
+        <text x="450" y="278" font-size="10" fill="#64748b">1,200.00</text>
+        <text x="500" y="278" font-size="11" fill="#0d9488">5%</text>
+        <text x="560" y="278" font-size="11" text-anchor="end">28,500.00</text>
 
-        <text x="55" y="325" font-size="12">Cetirizine 10mg Tablets (Alu-Alu)</text>
-        <text x="280" y="325" font-size="11" fill="#64748b">B#CT994</text>
-        <text x="345" y="325" font-size="12">40 box</text>
-        <text x="425" y="325" font-size="12">380.00</text>
-        <text x="500" y="325" font-size="12">15,200.00</text>
+        <text x="42" y="314" font-size="11" font-family="monospace">MED-318</text>
+        <text x="95" y="314" font-size="11">Cetirizine 10mg Tab (Alu-Alu)</text>
+        <text x="260" y="314" font-size="10" fill="#64748b">CT994 (09/27)</text>
+        <text x="345" y="314" font-size="11">40 box</text>
+        <text x="390" y="314" font-size="11">400.00</text>
+        <text x="450" y="314" font-size="10" fill="#64748b">450.00</text>
+        <text x="500" y="314" font-size="11" fill="#0d9488">5%</text>
+        <text x="560" y="314" font-size="11" text-anchor="end">15,200.00</text>
 
-        <text x="55" y="360" font-size="12">Betadine Antiseptic Solution 60ml</text>
-        <text x="280" y="360" font-size="11" fill="#64748b">B#BT440</text>
-        <text x="345" y="360" font-size="12">24 btl</text>
-        <text x="425" y="360" font-size="12">550.00</text>
-        <text x="500" y="360" font-size="12">13,200.00</text>
+        <text x="42" y="350" font-size="11" font-family="monospace">MED-442</text>
+        <text x="95" y="350" font-size="11">Betadine Antiseptic Sol. 60ml</text>
+        <text x="260" y="350" font-size="10" fill="#64748b">BT440 (02/28)</text>
+        <text x="345" y="350" font-size="11">24 btl</text>
+        <text x="390" y="350" font-size="11">550.00</text>
+        <text x="450" y="350" font-size="10" fill="#64748b">620.00</text>
+        <text x="500" y="350" font-size="11">0%</text>
+        <text x="560" y="350" font-size="11" text-anchor="end">13,200.00</text>
 
-        <line x1="45" y1="390" x2="555" y2="390" stroke="#cbd5e1" stroke-width="1"/>
-        <rect x="330" y="410" width="225" height="60" fill="#f8fafc" stroke="#0d9488" stroke-width="1.5"/>
-        <text x="345" y="445" font-size="14" font-weight="bold">NET AMOUNT (LKR):</text>
-        <text x="540" y="445" font-size="15" font-weight="bold" fill="#0f766e" text-anchor="end">Rs. 77,900.00</text>
+        <line x1="35" y1="380" x2="565" y2="380" stroke="#cbd5e1" stroke-width="1"/>
+        <rect x="330" y="400" width="235" height="60" fill="#f8fafc" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="345" y="435" font-size="13" font-weight="bold">NET AMOUNT (LKR):</text>
+        <text x="550" y="435" font-size="15" font-weight="bold" fill="#0f766e" text-anchor="end">Rs. 77,900.00</text>
 
-        <text x="55" y="530" font-size="11" fill="#64748b">Verified by Pharmacist: SLMC-8944</text>
-        <rect x="55" y="550" width="160" height="50" fill="#ecfdf5" stroke="#10b981" stroke-width="1" rx="4"/>
-        <text x="135" y="580" font-size="12" font-weight="bold" fill="#047857" text-anchor="middle">PASSED QA INSPECTION</text>
+        <text x="45" y="520" font-size="11" fill="#64748b">Verified by Pharmacist: SLMC-8944</text>
+        <rect x="45" y="540" width="160" height="45" fill="#ecfdf5" stroke="#10b981" stroke-width="1" rx="4"/>
+        <text x="125" y="567" font-size="11" font-weight="bold" fill="#047857" text-anchor="middle">PASSED QA INSPECTION</text>
       </svg>
     `),
     data: {
@@ -166,13 +182,57 @@ export const SAMPLE_BILLS: SampleBill[] = [
       invoice_date: '2026-11-05',
       category: 'Pharmacy',
       items: [
-        { name: 'Panadol 500mg Tablets (100s box)', quantity: 50, unit: 'box', unit_price: 420.00, total: 21000.00 },
-        { name: 'Amoxicillin 250mg Capsules (10x10)', quantity: 30, unit: 'pkt', unit_price: 950.00, total: 28500.00 },
-        { name: 'Cetirizine 10mg Tablets (Alu-Alu)', quantity: 40, unit: 'box', unit_price: 380.00, total: 15200.00 },
-        { name: 'Betadine Antiseptic Solution 60ml', quantity: 24, unit: 'btl', unit_price: 550.00, total: 13200.00 },
+        {
+          name: 'Panadol 500mg Tablets (100s box)',
+          product_code: 'MED-101',
+          batch_no: 'GS881',
+          expiry_date: '2028-04',
+          quantity: 50,
+          unit: 'box',
+          unit_price: 420.00,
+          retail_price: 450.00,
+          discount_percent: 0,
+          total: 21000.00
+        },
+        {
+          name: 'Amoxicillin 250mg Capsules (10x10)',
+          product_code: 'MED-205',
+          batch_no: 'AM201',
+          expiry_date: '2027-11',
+          quantity: 30,
+          unit: 'pkt',
+          unit_price: 1000.00,
+          retail_price: 1200.00,
+          discount_percent: 5,
+          total: 28500.00
+        },
+        {
+          name: 'Cetirizine 10mg Tablets (Alu-Alu)',
+          product_code: 'MED-318',
+          batch_no: 'CT994',
+          expiry_date: '2027-09',
+          quantity: 40,
+          unit: 'box',
+          unit_price: 400.00,
+          retail_price: 450.00,
+          discount_percent: 5,
+          total: 15200.00
+        },
+        {
+          name: 'Betadine Antiseptic Solution 60ml',
+          product_code: 'MED-442',
+          batch_no: 'BT440',
+          expiry_date: '2028-02',
+          quantity: 24,
+          unit: 'btl',
+          unit_price: 550.00,
+          retail_price: 620.00,
+          discount_percent: 0,
+          total: 13200.00
+        },
       ],
       grand_total: 77900.00,
-      confidence_notes: 'Extracted with high confidence. Batch numbers identified and packaging units normalized (box, pkt, btl).'
+      confidence_notes: 'Extracted with high confidence. Product codes (MED-101..), batch numbers, expiry dates, trade discount %, and canonical units normalized (box, pkt, btl).'
     }
   },
   {
@@ -343,8 +403,28 @@ export const SAMPLE_BILLS: SampleBill[] = [
       invoice_date: '2026-11-08',
       category: 'Pharmacy',
       items: [
-        { name: 'Augmentin 625mg (14s tab pack)', quantity: 4, unit: 'pkt', unit_price: 2850.00, total: 11400.00 },
-        { name: 'Surgical Face Masks 3-Ply', quantity: 5, unit: 'box', unit_price: 720.00, total: 3600.00 },
+        {
+          name: 'Augmentin 625mg (14s tab pack)',
+          product_code: 'AUG-625',
+          batch_no: 'BN4091',
+          expiry_date: '2027-06',
+          quantity: 4,
+          unit: 'pkt',
+          unit_price: 2850.00,
+          retail_price: 3200.00,
+          total: 11400.00
+        },
+        {
+          name: 'Surgical Face Masks 3-Ply',
+          product_code: 'MSK-03',
+          batch_no: 'MK882',
+          expiry_date: '2028-12',
+          quantity: 5,
+          unit: 'box',
+          unit_price: 720.00,
+          retail_price: 850.00,
+          total: 3600.00
+        },
       ],
       subtotal: 15000.00,
       discount: 750.00,

@@ -43,6 +43,9 @@ export const PACKAGING_UNITS = [
   'strip',
   'tab',
   'cap',
+  'amp',
+  'vial',
+  'tube',
   'g',
   'ml',
   'l',
@@ -88,9 +91,15 @@ export const CATEGORY_CONFIG = {
 export const InvoiceItemSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Item name is required'),
+  product_code: z.string().nullable().optional(),
+  batch_no: z.string().nullable().optional(),
+  expiry_date: z.string().nullable().optional(),
   quantity: z.number().nullable().optional(),
   unit: z.string().default('nos'),
+  retail_price: z.number().nullable().optional(),
   unit_price: z.number().nullable().optional(),
+  discount_percent: z.number().nullable().optional(),
+  discount: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
   is_illegible: z.boolean().optional(),
   isFlagged: z.boolean().optional(),
@@ -175,11 +184,22 @@ export function checkArithmeticIntegrity(
   const roundedGrand = Math.round(Number(grandTotal || 0) * 100) / 100;
   const diff = Math.round(Math.abs(roundedCalculated - roundedGrand) * 100) / 100;
 
-  // Check row-level arithmetic: does quantity * unit_price == total for each item?
+  // Check row-level arithmetic: does quantity * unit_price (- discount) == total for each item?
   let rowLevelErrorsCount = 0;
   for (const item of items) {
     if (item.quantity != null && item.unit_price != null && item.total != null) {
-      const expectedLineTotal = Math.round(Number(item.quantity) * Number(item.unit_price) * 100) / 100;
+      const rawLine = Number(item.quantity) * Number(item.unit_price);
+      let expectedLineTotal: number;
+
+      if (item.discount_percent != null && Number(item.discount_percent) > 0) {
+        const discAmount = (rawLine * Number(item.discount_percent)) / 100;
+        expectedLineTotal = Math.round((rawLine - discAmount) * 100) / 100;
+      } else if (item.discount != null && Number(item.discount) > 0) {
+        expectedLineTotal = Math.round((rawLine - Number(item.discount)) * 100) / 100;
+      } else {
+        expectedLineTotal = Math.round(rawLine * 100) / 100;
+      }
+
       if (Math.abs(expectedLineTotal - Number(item.total)) > tolerance) {
         rowLevelErrorsCount++;
       }
