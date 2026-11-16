@@ -75,13 +75,16 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
     startTimer();
 
     try {
-      // 1. Client-side compression & format handling (with HEIC support)
-      setLoadingStep('Optimizing photo for high-speed upload...');
-      const compResult = await compressInvoiceImage(file, 1600, 0.85);
+      // 1. Client-side compression & format handling (with HEIC support + Document Scanner)
+      setLoadingStep('📷 Optimizing photo for high-speed upload...');
+      const compResult = await compressInvoiceImage(file, 2000, 0.92);
       setCompressionInfo(compResult);
 
-      // 2. Call Gemini Vision API Route with 60s timeout (accommodates cold start & API retries)
-      setLoadingStep('Reading bill with Gemini Flash...');
+      if (compResult.scannerEnhanced) {
+        setLoadingStep('🔍 Document scanner enhanced! Reading with Gemini Flash...');
+      } else {
+        setLoadingStep('Reading bill with Gemini Flash...');
+      }
       const userSettings = getUserSettings();
 
       const controller = new AbortController();
@@ -256,6 +259,12 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
                 <span>Compressed to {formatBytes(compressionInfo.compressedSizeBytes)}</span>
                 <span>•</span>
                 <span>{compressionInfo.width}×{compressionInfo.height}px</span>
+                {compressionInfo.scannerEnhanced && (
+                  <>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-semibold">📄 Scanner Enhanced ({compressionInfo.scannerProcessingMs}ms)</span>
+                  </>
+                )}
               </div>
             )}
           </div>

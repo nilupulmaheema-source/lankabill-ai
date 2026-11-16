@@ -148,9 +148,10 @@ export async function POST(req: NextRequest) {
         const jpegBuffer = await heicConvert({
           buffer,
           format: 'JPEG',
-          quality: 0.85,
+          quality: 0.92,
         });
-        cleanBase64 = jpegBuffer.toString('base64');
+
+        cleanBase64 = Buffer.from(jpegBuffer).toString('base64');
         effectiveMimeType = 'image/jpeg';
         displayImageUrl = `data:image/jpeg;base64,${cleanBase64}`;
       }
@@ -197,12 +198,11 @@ export async function POST(req: NextRequest) {
       httpOptions: { apiVersion: 'v1beta' },
     });
 
-    // High-speed, responsive vision models calibrated for fast sub-5s extraction
+    // High-speed, responsive vision models calibrated for fast sub-10s extraction
     const candidateModels = [
-      'gemini-flash-lite-latest',
       'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-3.1-pro-preview',
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash',
     ];
 
     let lastError: any = null;
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
                   description: 'Normalized [ymin, xmin, ymax, xmax] coordinates from 0 to 1000',
                 },
               },
-              required: ['name'],
+              required: ['name', 'quantity', 'unit_price', 'total'],
             },
           },
           subtotal: { type: Type.NUMBER },
@@ -269,14 +269,14 @@ export async function POST(req: NextRequest) {
             },
           },
           {
-            text: 'Analyze this physical Sri Lankan invoice / chit photo. Extract all header fields and line items into strict JSON according to the schema. Ensure Discount % column (e.g. 8.00) is extracted into discount_percent, and Value(Rs.) is extracted into total for each line item.',
+            text: 'Analyze this physical Sri Lankan invoice / chit photo. The image has been pre-processed through a document scanner pipeline (adaptive thresholding, contrast enhancement, noise reduction) to produce clean black text on white background. Extract all header fields and line items into strict JSON according to the schema. Ensure Discount % column (e.g. 8.00) is extracted into discount_percent, and Value(Rs.) is extracted into total for each line item. CRITICAL: Each row\'s Quantity, Price, and Discount % must stay horizontally aligned with its own Item Description — never shift numbers between rows.',
           },
         ],
       },
     ];
 
-    // Fast failover helper with 12s timeout per model to eliminate 60s stalls
-    const generateWithTimeout = async (model: string, timeoutMs = 12000) => {
+    // Fast failover helper with 25s timeout per model to give vision generation full breathing room
+    const generateWithTimeout = async (model: string, timeoutMs = 25000) => {
       let timer: NodeJS.Timeout;
       const timeoutPromise = new Promise((_, reject) => {
         timer = setTimeout(
@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
     // Attempt candidate models with zero stall: fast failover to the first responsive model
     for (const model of candidateModels) {
       try {
-        response = await generateWithTimeout(model, 12000);
+        response = await generateWithTimeout(model, 25000);
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;

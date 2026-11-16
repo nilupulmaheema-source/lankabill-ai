@@ -8,6 +8,10 @@ export interface CompressionResult {
   height: number;
   durationMs: number;
   isConvertedFromHeic?: boolean;
+  /** Whether document scanner enhancement was applied */
+  scannerEnhanced?: boolean;
+  /** Scanner processing time in ms (subset of durationMs) */
+  scannerProcessingMs?: number;
 }
 
 /**
@@ -145,7 +149,7 @@ export async function compressInvoiceImage(
     };
   }
 
-  // 3. Standard image compression via Canvas
+  // 3. Standard image compression via Canvas + Document Scanner Enhancement
   return new Promise((resolve) => {
     const reader = new FileReader();
 
@@ -167,8 +171,6 @@ export async function compressInvoiceImage(
     reader.onload = (e) => {
       const img = new Image();
 
-      // IF HTML5 IMAGE DECODER EVER FAILS: Never reject with an error!
-      // Fallback gracefully to raw base64 and let the server process it!
       img.onerror = () => {
         console.warn('Browser new Image() decoder failed. Passing raw base64 directly to server.');
         const raw = (e.target?.result as string) || '';
@@ -185,7 +187,7 @@ export async function compressInvoiceImage(
         });
       };
 
-      img.onload = () => {
+      img.onload = async () => {
         let width = img.naturalWidth || img.width;
         let height = img.naturalHeight || img.height;
 
@@ -203,7 +205,7 @@ export async function compressInvoiceImage(
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) {
           const raw = (e.target?.result as string) || '';
           const pure = raw.split(',')[1] || '';
@@ -220,15 +222,52 @@ export async function compressInvoiceImage(
           return;
         }
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        // Optical document enhancement: boosts contrast & clarity for faint dot-matrix pins and broken carbon copy handwriting
-        try {
-          ctx.filter = 'contrast(108%) brightness(102%)';
-        } catch {
-          // Graceful fallback if unsupported
-        }
         ctx.drawImage(img, 0, 0, width, height);
+
+        // ═══════════════════════════════════════════════════════════════
+        // DOCUMENT SCANNER ENHANCEMENT PIPELINE
+        // Replicates CamScanner / Adobe Scan / Apple Document Scanner
+        // ═══════════════════════════════════════════════════════════════
+        let scannerMs = 0;
+        let wasEnhanced = false;
+        try {
+          const { scanDocument } = await import('@/lib/documentScanner');
+          const rawBase64 = canvas.toDataURL('image/jpeg', 0.95);
+
+          const scanStart = performance.now();
+          const scanResult = await scanDocument(rawBase64, 'auto');
+          scannerMs = Math.round(performance.now() - scanStart);
+
+          if (scanResult.mode === 'document-scan') {
+            // Load the enhanced image back onto our canvas for final export
+            const enhancedImg = new Image();
+            await new Promise<void>((resolveImg) => {
+              enhancedImg.onload = () => {
+                canvas.width = enhancedImg.naturalWidth || enhancedImg.width;
+                canvas.height = enhancedImg.naturalHeight || enhancedImg.height;
+                ctx.drawImage(enhancedImg, 0, 0);
+                width = canvas.width;
+                height = canvas.height;
+                wasEnhanced = true;
+                resolveImg();
+              };
+              enhancedImg.onerror = () => resolveImg(); // Fallback to original
+              enhancedImg.src = scanResult.enhancedBase64;
+            });
+          }
+        } catch (scanErr) {
+          console.warn('Document scanner enhancement skipped:', scanErr);
+        }
+
+        // If scanner didn't run, apply basic contrast/brightness enhancement
+        if (!wasEnhanced) {
+          try {
+            ctx.filter = 'contrast(115%) brightness(103%)';
+            ctx.drawImage(canvas, 0, 0);
+          } catch {
+            // filter not supported
+          }
+        }
 
         const mimeType = 'image/jpeg';
         const base64Data = canvas.toDataURL(mimeType, quality);
@@ -243,6 +282,8 @@ export async function compressInvoiceImage(
           width,
           height,
           durationMs: Math.round(performance.now() - startTime),
+          scannerEnhanced: wasEnhanced,
+          scannerProcessingMs: scannerMs,
         });
       };
 
