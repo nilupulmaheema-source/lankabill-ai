@@ -12,9 +12,6 @@ import {
   Sparkles,
   Calculator,
   Building,
-  Hash,
-  Calendar,
-  Layers,
   Split,
   Eye,
   FileEdit,
@@ -32,7 +29,6 @@ import {
   InvoiceCategoryValues,
   InvoiceRecord,
   checkArithmeticIntegrity,
-  CATEGORY_CONFIG,
 } from '@/types/invoice';
 import { analyzePriceCreep, PriceCreepAnalysis } from '@/lib/priceRadar';
 
@@ -82,26 +78,10 @@ export function ScreenReview({
     return (initialData.items || []).map((it, idx) => {
       const discPct = it.discount_percent ?? inferredDiscPct ?? 0;
       let lineTotal = it.total ?? null;
-      let qty = it.quantity ?? null;
-      const price = it.unit_price ?? null;
-
-      const effectiveMult = 1 - (discPct > 0 ? discPct / 100 : 0);
-      const netPrice = price != null && effectiveMult > 0 ? price * effectiveMult : price;
-
-      // Self-Healing Math Check: detect dropped zeros on dot-matrix print (e.g. 10 -> 100)
-      if (lineTotal != null && lineTotal > 0 && netPrice != null && netPrice > 0) {
-        const derivedQty = lineTotal / netPrice;
-        const rounded = Math.round(derivedQty);
-        if (Math.abs(derivedQty - rounded) < 0.05) {
-          if (qty == null || (qty > 0 && Math.abs(qty - rounded) >= 1 && (rounded % qty === 0 || qty % rounded === 0))) {
-            qty = rounded;
-          }
-        }
-      }
 
       // Auto-compute line total if not provided by OCR but qty & price exist
-      if (lineTotal == null && qty != null && price != null) {
-        const raw = Number(qty) * Number(price);
+      if (lineTotal == null && it.quantity != null && it.unit_price != null) {
+        const raw = Number(it.quantity) * Number(it.unit_price);
         lineTotal = Math.round(raw * (1 - discPct / 100) * 100) / 100;
       }
 
@@ -109,9 +89,9 @@ export function ScreenReview({
         ...it,
         id: it.id || `item-${Date.now()}-${idx}`,
         unit: it.unit || 'nos',
-        quantity: qty,
+        quantity: it.quantity ?? null,
         free_quantity: it.free_quantity ?? null,
-        unit_price: price,
+        unit_price: it.unit_price ?? null,
         discount_percent: discPct > 0 ? discPct : (it.discount_percent ?? 0),
         total: lineTotal,
       };
@@ -139,7 +119,7 @@ export function ScreenReview({
     };
   }, [items]);
 
-  // Arithmetic Integrity Check (Discriminated Union pattern with Day 1 Calibrated Tolerance)
+  // Arithmetic Integrity Check (Discriminated Union pattern)
   const integrity = useMemo(
     () =>
       checkArithmeticIntegrity(items, grandTotalInput, {
@@ -176,40 +156,16 @@ export function ScreenReview({
           const discAmt = field === 'discount' ? (value === '' || value === null ? null : Number(value)) : updated.discount;
 
           if (qty != null && price != null) {
-            const rawLine = qty * price;
-            let netLine = rawLine;
+            const raw = Number(qty) * Number(price);
+            let net = raw;
 
             if (discPct != null && Number(discPct) > 0) {
-              netLine = rawLine * (1 - Number(discPct) / 100);
+              net = raw * (1 - Number(discPct) / 100);
             } else if (discAmt != null && Number(discAmt) > 0) {
-              netLine = rawLine - Number(discAmt);
+              net = raw - Number(discAmt);
             }
 
-            updated.total = Math.round(netLine * 100) / 100;
-            updated.is_illegible = false;
-          }
-        }
-
-        // Check row-level arithmetic integrity
-        if (updated.quantity == null || updated.unit_price == null || updated.total == null) {
-          updated.isFlagged = true;
-          updated.flagReason = 'Missing or illegible figure on bill';
-        } else {
-          const rawLine = Number(updated.quantity) * Number(updated.unit_price);
-          let lineExpected = rawLine;
-          if (updated.discount_percent != null && Number(updated.discount_percent) > 0) {
-            lineExpected = rawLine * (1 - Number(updated.discount_percent) / 100);
-          } else if (updated.discount != null && Number(updated.discount) > 0) {
-            lineExpected = rawLine - Number(updated.discount);
-          }
-          lineExpected = Math.round(lineExpected * 100) / 100;
-
-          if (Math.abs(lineExpected - Number(updated.total)) > 1.0) {
-            updated.isFlagged = true;
-            updated.flagReason = `Diff: Expected Rs. ${lineExpected.toFixed(2)} (Qty: ${updated.quantity}, Rate: ${updated.unit_price}${updated.discount_percent ? `, Disc: ${updated.discount_percent}%` : ''})`;
-          } else {
-            updated.isFlagged = false;
-            updated.flagReason = undefined;
+            updated.total = Math.round(net * 100) / 100;
           }
         }
 
@@ -235,6 +191,7 @@ export function ScreenReview({
       total: 0,
     };
     setItems((prev) => [...prev, newItem]);
+    setActiveItemIndex(items.length);
   };
 
   // Delete row
@@ -258,7 +215,7 @@ export function ScreenReview({
     setGrandTotalInput(Math.round(calculatedTotal * 100) / 100);
   };
 
-  // Recalculate all row totals based on qty * unit_price (with discounts accounted for)
+  // Recalculate all row totals based on qty * unit_price
   const handleRecalculateAllRows = () => {
     setItems((prev) =>
       prev.map((it) => {
@@ -343,82 +300,84 @@ export function ScreenReview({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-6 py-4 space-y-4">
-      {/* Top Banner & Timing Benchmark */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3.5 rounded-xl">
-        <div className="flex items-center gap-2">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-5 animate-in fade-in duration-200">
+      {/* Top Floating Glass Navigation Header */}
+      <div className="ios-glass border border-black/[0.06] dark:border-white/[0.08] p-3.5 sm:p-4 rounded-3xl shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={onDiscard}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors ios-pressable"
             title="Back to Capture"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              Side-by-Side Bill Verification
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                Invoice Verification
+              </h2>
+              <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
                 Ready for Review
               </span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Cross-check Gemini vision extraction with original document.
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-normal">
+              Compare AI extracted numbers against original receipt photo
             </p>
           </div>
         </div>
 
         {/* Mobile View Toggle Pills */}
-        <div className="flex lg:hidden items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+        <div className="flex lg:hidden items-center bg-slate-200/60 dark:bg-zinc-800/80 p-0.5 rounded-full border border-black/[0.04] dark:border-white/[0.06]">
           <button
             type="button"
             onClick={() => setMobileView('photo')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5 transition-all ios-pressable ${
               mobileView === 'photo'
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-zinc-400'
             }`}
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-3 h-3" />
             <span>Photo</span>
           </button>
           <button
             type="button"
             onClick={() => setMobileView('split')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5 transition-all ios-pressable ${
               mobileView === 'split'
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-zinc-400'
             }`}
           >
-            <Split className="w-3.5 h-3.5" />
-            <span>Stacked</span>
+            <Split className="w-3 h-3" />
+            <span>Split</span>
           </button>
           <button
             type="button"
             onClick={() => setMobileView('form')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5 transition-all ios-pressable ${
               mobileView === 'form'
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-zinc-400'
             }`}
           >
-            <FileEdit className="w-3.5 h-3.5" />
+            <FileEdit className="w-3 h-3" />
             <span>Form</span>
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-md">
-            <Sparkles className="w-3.5 h-3.5" />
-            Extracted in {(processingTimeMs / 1000).toFixed(2)}s
+          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+            <Sparkles className="w-3 h-3 text-emerald-500" />
+            <span>{(processingTimeMs / 1000).toFixed(2)}s scan time</span>
           </span>
         </div>
       </div>
 
-      {/* CORE SPLIT SCREEN: LEFT PHOTO (Pan & Zoom) vs RIGHT EDITABLE FORM */}
+      {/* CORE SPLIT SCREEN */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LEFT / TOP: Interactive Pan-and-Zoom Bill Viewport with Visual Grounding Laser Boxes */}
+        {/* LEFT / TOP: Interactive Pan-and-Zoom Bill Viewport */}
         <div
           className={`lg:col-span-5 h-[380px] lg:h-[720px] sticky top-20 ${
             mobileView === 'form' ? 'hidden lg:block' : 'block'
@@ -439,20 +398,20 @@ export function ScreenReview({
             mobileView === 'photo' ? 'hidden lg:block' : 'block'
           }`}
         >
-          {/* HEADER METADATA FIELDS CARD */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <Building className="w-4 h-4 text-emerald-400" />
+          {/* HEADER METADATA FIELDS (Apple Inset Grouped Style) */}
+          <div className="ios-glass border border-black/[0.06] dark:border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-black/[0.04] dark:border-white/[0.06] pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-slate-700 dark:text-zinc-300" />
                 <span>Invoice Header Details</span>
               </h3>
-              <span className="text-[11px] text-slate-400">Click any field to edit</span>
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-normal">Tap field to edit</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Vendor Name */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                   Vendor / Supplier Name
                 </label>
                 <input
@@ -460,13 +419,13 @@ export function ScreenReview({
                   value={vendorName}
                   onChange={(e) => setVendorName(e.target.value)}
                   placeholder="e.g. Tokyo Cement, Western Pharma..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2 text-sm text-slate-900 dark:text-white font-medium transition-all"
                 />
               </div>
 
               {/* Invoice Number */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                   Invoice / Chit No.
                 </label>
                 <input
@@ -474,32 +433,32 @@ export function ScreenReview({
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
                   placeholder="e.g. INV-2026-001"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2 text-sm text-slate-900 dark:text-white font-mono transition-all"
                 />
               </div>
 
               {/* Invoice Date */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                   Invoice Date
                 </label>
                 <input
                   type="date"
                   value={invoiceDate}
                   onChange={(e) => setInvoiceDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2 text-sm text-slate-900 dark:text-white font-mono transition-all"
                 />
               </div>
 
               {/* Category */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+                <label className="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                   Retail Category
                 </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as InvoiceCategory)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2 text-sm text-slate-900 dark:text-white transition-all"
                 >
                   {InvoiceCategoryValues.map((cat) => (
                     <option key={cat} value={cat}>
@@ -511,22 +470,22 @@ export function ScreenReview({
             </div>
           </div>
 
-          {/* LANKA PRICE CREEP & INFLATION RADAR BANNER (Day 2 Magic Moment) */}
+          {/* LANKA PRICE CREEP & INFLATION RADAR BANNER (Apple Health Insight Card Style) */}
           {priceAnalysis && (
             <div
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 sm:p-5 rounded-3xl border transition-all ios-glass ${
                 priceAnalysis.increasedCount > 0
-                  ? 'bg-rose-950/30 border-rose-500/50 text-rose-200'
-                  : 'bg-slate-900/90 border-slate-800 text-slate-300'
+                  ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/30 text-rose-900 dark:text-rose-200'
+                  : 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
               }`}
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start sm:items-center gap-3">
                   <div
-                    className={`p-2.5 rounded-xl flex-shrink-0 ${
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                       priceAnalysis.increasedCount > 0
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                        : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                     }`}
                   >
                     {priceAnalysis.increasedCount > 0 ? (
@@ -537,29 +496,29 @@ export function ScreenReview({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-sm text-white">
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
                         {priceAnalysis.increasedCount > 0
-                          ? `⚠️ Price Creep Alert: ${priceAnalysis.increasedCount} Item${
+                          ? `⚠️ Price Increase Detected (${priceAnalysis.increasedCount} Item${
                               priceAnalysis.increasedCount > 1 ? 's' : ''
-                            } Billed at Higher Unit Cost`
-                          : '🛡️ Price Radar Active: Zero Supplier Markups Detected'}
+                            })`
+                          : 'Price Stability Verified: Zero Markups'}
                       </h4>
                       {priceAnalysis.increasedCount > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wide">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20 uppercase tracking-wide">
                           Supplier Markup
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-300 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-zinc-300 mt-1 font-normal">
                       {priceAnalysis.increasedCount > 0 ? (
                         <>
-                          Historical ledger comparison shows supplier increased prices. Extra cost on this delivery:{' '}
-                          <b className="font-mono text-rose-300 text-sm">
+                          Historical ledger comparison shows supplier increased prices. Cost impact:{' '}
+                          <b className="font-mono text-rose-700 dark:text-rose-300 text-sm tabular-nums">
                             +Rs. {priceAnalysis.totalPriceHikeImpact.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                           </b>
                           {priceAnalysis.highestHikeItem && (
-                            <span className="block sm:inline sm:ml-2 text-rose-400/90 text-[11px]">
-                              (Highest hike: {priceAnalysis.highestHikeItem.name} +{priceAnalysis.highestHikeItem.diffPercentage}%)
+                            <span className="block sm:inline sm:ml-2 text-rose-600 dark:text-rose-400 text-[11px]">
+                              ({priceAnalysis.highestHikeItem.name} +{priceAnalysis.highestHikeItem.diffPercentage}%)
                             </span>
                           )}
                         </>
@@ -570,9 +529,9 @@ export function ScreenReview({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800 self-stretch sm:self-auto justify-between sm:justify-start">
-                  <span>Price History</span>
-                  <span className="text-emerald-400 font-bold">
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-zinc-400 ios-glass px-3 py-1.5 rounded-full border border-black/[0.04] dark:border-white/[0.06] self-stretch sm:self-auto justify-between sm:justify-start">
+                  <span>History Checked</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
                     {priceAnalysis.analyzedItems.filter((i) => i.price_comparison?.status !== 'new').length} Matched
                   </span>
                 </div>
@@ -582,33 +541,37 @@ export function ScreenReview({
 
           {/* ARITHMETIC INTEGRITY CHECK BANNER */}
           <div
-            className={`p-4 rounded-xl border transition-all ${
+            className={`p-4 sm:p-5 rounded-3xl border transition-all ios-glass ${
               hasDiscrepancy
-                ? 'bg-amber-950/40 border-amber-500/60 text-amber-200'
-                : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                ? 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30 text-amber-900 dark:text-amber-200'
+                : 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
             }`}
           >
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                {hasDiscrepancy ? (
-                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    hasDiscrepancy
+                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                      : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                  }`}
+                >
+                  {hasDiscrepancy ? (
                     <AlertTriangle className="w-5 h-5" />
-                  </div>
-                ) : (
-                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                  ) : (
                     <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                )}
+                  )}
+                </div>
                 <div>
-                  <h4 className="font-bold text-sm">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">
                     {hasDiscrepancy
-                      ? `⚠️ Discrepancy detected: Diff of Rs. ${discrepancy.toLocaleString('en-LK', {
+                      ? `Calculation Mismatch: Diff of Rs. ${discrepancy.toLocaleString('en-LK', {
                           minimumFractionDigits: 2,
                         })}`
-                      : 'Arithmetic Integrity Verified (Zero Discrepancy)'}
+                      : 'Arithmetic Verified (Zero Discrepancy)'}
                   </h4>
-                  <p className="text-xs text-slate-300">
-                    Calculated Line Sum: <b className="font-mono">Rs. {calculatedTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</b> | Bill Grand Total: <b className="font-mono">Rs. {Number(grandTotalInput).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</b>
+                  <p className="text-xs text-slate-600 dark:text-zinc-300 font-normal">
+                    Line Sum: <b className="font-mono tabular-nums">Rs. {calculatedTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</b> | Bill Total: <b className="font-mono tabular-nums">Rs. {Number(grandTotalInput).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</b>
                   </p>
                 </div>
               </div>
@@ -618,7 +581,7 @@ export function ScreenReview({
                   <button
                     type="button"
                     onClick={handleAutoFixGrandTotal}
-                    className="flex-1 sm:flex-initial text-xs font-semibold px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors shadow flex items-center justify-center gap-1"
+                    className="flex-1 sm:flex-initial text-xs font-semibold px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-500 text-white transition-colors shadow-sm flex items-center justify-center gap-1.5 ios-pressable"
                   >
                     <Wand2 className="w-3.5 h-3.5" />
                     <span>Auto-Balance Total</span>
@@ -626,7 +589,7 @@ export function ScreenReview({
                   <button
                     type="button"
                     onClick={handleRecalculateAllRows}
-                    className="flex-1 sm:flex-initial text-xs font-semibold px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors border border-slate-700"
+                    className="flex-1 sm:flex-initial text-xs font-semibold px-3 py-2 rounded-full bg-slate-200 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 transition-colors ios-pressable"
                     title="Recalculate row totals from Qty x Price"
                   >
                     Sync Lines
@@ -636,18 +599,18 @@ export function ScreenReview({
             </div>
           </div>
 
-          {/* LINE ITEMS TABLE (EDITABLE) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          {/* LINE ITEMS TABLE (Notion / Apple Numbers Clean Style) */}
+          <div className="ios-glass border border-black/[0.06] dark:border-white/[0.08] rounded-3xl overflow-hidden shadow-sm">
             {/* Table Header Controls */}
-            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <div className="p-4 border-b border-black/[0.04] dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Itemized Line Items ({items.length})
+                <Calculator className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400">
+                  Line Items ({items.length})
                 </h3>
                 {category === 'Pharmacy' && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
-                    Pharma Distribution Mode
+                  <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                    Pharma Mode
                   </span>
                 )}
               </div>
@@ -656,16 +619,16 @@ export function ScreenReview({
                   <button
                     type="button"
                     onClick={() => handleApplyAllDiscount(8)}
-                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-200 border border-teal-600 transition-colors"
+                    className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 transition-colors ios-pressable"
                     title="Apply standard 8% Sri Lankan pharma distributor trade discount to all items"
                   >
-                    <span>⚡ Apply 8% Trade Disc</span>
+                    <span>⚡ 8% Trade Disc</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={handleAddRow}
-                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white transition-colors ios-pressable shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Row</span>
@@ -673,38 +636,38 @@ export function ScreenReview({
               </div>
             </div>
 
-            {/* Mobile Cards for < 640px / Responsive Table for >= 640px */}
+            {/* Seamless Borderless Inline Editable Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-950/60 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                  <tr className="bg-black/[0.02] dark:bg-white/[0.02] text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider border-b border-black/[0.04] dark:border-white/[0.06]">
                     {category === 'Pharmacy' ? (
                       <>
-                        <th className="py-2.5 px-2 min-w-[85px] w-20">Item Code</th>
-                        <th className="py-2.5 px-3 min-w-[170px]">Drug / Item Description</th>
-                        <th className="py-2.5 px-2 min-w-[100px] w-24">Batch / Exp</th>
-                        <th className="py-2.5 px-2 w-16 text-center">Billed Qty</th>
-                        <th className="py-2.5 px-2 w-16 text-center text-teal-400">Bonus Qty</th>
-                        <th className="py-2.5 px-2 w-14 text-center">Unit</th>
-                        <th className="py-2.5 px-2 min-w-[90px] text-right">Wholesale (Rs.)</th>
-                        <th className="py-2.5 px-2 min-w-[85px] text-right">MRP (Rs.)</th>
-                        <th className="py-2.5 px-2 w-14 text-right">Disc %</th>
-                        <th className="py-2.5 px-2 min-w-[105px] text-right">Net Total (Rs.)</th>
-                        <th className="py-2.5 px-2 w-8 text-center"></th>
+                        <th className="py-3 px-2 min-w-[85px] w-20">Code</th>
+                        <th className="py-3 px-3 min-w-[170px]">Description</th>
+                        <th className="py-3 px-2 min-w-[100px] w-24">Batch / Exp</th>
+                        <th className="py-3 px-2 w-16 text-center">Billed Qty</th>
+                        <th className="py-3 px-2 w-16 text-center text-teal-600 dark:text-teal-400">Bonus</th>
+                        <th className="py-3 px-2 w-14 text-center">Unit</th>
+                        <th className="py-3 px-2 min-w-[90px] text-right">Cost (Rs.)</th>
+                        <th className="py-3 px-2 min-w-[85px] text-right">MRP (Rs.)</th>
+                        <th className="py-3 px-2 w-14 text-right">Disc %</th>
+                        <th className="py-3 px-2 min-w-[105px] text-right">Total (Rs.)</th>
+                        <th className="py-3 px-2 w-8 text-center"></th>
                       </>
                     ) : (
                       <>
-                        <th className="py-2.5 px-3 min-w-[180px]">Item Description</th>
-                        <th className="py-2.5 px-2 w-20 text-center">Qty</th>
-                        <th className="py-2.5 px-2 w-20">Unit</th>
-                        <th className="py-2.5 px-2 min-w-[110px] text-right">Unit Price (LKR)</th>
-                        <th className="py-2.5 px-2 min-w-[120px] text-right">Total (LKR)</th>
-                        <th className="py-2.5 px-2 w-10 text-center"></th>
+                        <th className="py-3 px-3 min-w-[180px]">Description</th>
+                        <th className="py-3 px-2 w-20 text-center">Qty</th>
+                        <th className="py-3 px-2 w-20">Unit</th>
+                        <th className="py-3 px-2 min-w-[110px] text-right">Unit Price (Rs.)</th>
+                        <th className="py-3 px-2 min-w-[120px] text-right">Total (Rs.)</th>
+                        <th className="py-3 px-2 w-10 text-center"></th>
                       </>
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 text-xs">
+                <tbody className="divide-y divide-black/[0.03] dark:divide-white/[0.04] text-xs">
                   {items.map((item, idx) => {
                     const comparison = priceAnalysis?.analyzedItems[idx]?.price_comparison;
                     const isActive = activeItemIndex === idx;
@@ -713,12 +676,12 @@ export function ScreenReview({
                       <tr
                         key={item.id || idx}
                         onClick={() => setActiveItemIndex(idx)}
-                        className={`cursor-pointer transition-all ${
+                        className={`cursor-pointer transition-colors ${
                           isActive
-                            ? 'bg-emerald-950/40 ring-1 ring-emerald-400'
+                            ? 'bg-emerald-500/10 dark:bg-emerald-500/15'
                             : item.isFlagged
-                            ? 'bg-amber-950/30 hover:bg-amber-950/40'
-                            : 'hover:bg-slate-800/40'
+                            ? 'bg-amber-500/5 hover:bg-amber-500/10'
+                            : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
                         }`}
                       >
                         {category === 'Pharmacy' ? (
@@ -730,7 +693,7 @@ export function ScreenReview({
                                 value={item.product_code || ''}
                                 onChange={(e) => handleItemChange(item.id!, 'product_code', e.target.value)}
                                 placeholder="Code"
-                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500 uppercase"
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded-lg px-2 py-1 text-xs text-slate-800 dark:text-zinc-200 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 uppercase transition-colors"
                               />
                             </td>
 
@@ -741,13 +704,13 @@ export function ScreenReview({
                                 value={item.name}
                                 onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
                                 placeholder="Panadol 500mg, Amox 250..."
-                                className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
-                                  item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
+                                className={`w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded-lg px-2 py-1 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors ${
+                                  item.isFlagged ? 'font-semibold text-amber-700 dark:text-amber-400' : ''
                                 }`}
                               />
                               
                               {/* Visual Grounding & Price Creep Badges */}
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1 px-1">
                                 {item.bounding_box && (
                                   <button
                                     type="button"
@@ -755,350 +718,350 @@ export function ScreenReview({
                                       e.stopPropagation();
                                       setActiveItemIndex(idx);
                                     }}
-                                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 transition-all ios-pressable ${
                                       isActive
-                                        ? 'bg-emerald-500 text-white font-bold'
-                                        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900'
+                                        ? 'bg-emerald-500 text-white font-bold shadow-sm'
+                                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
                                     }`}
                                     title="View on original bill photo"
                                   >
                                     <Target className="w-2.5 h-2.5" />
-                                    <span>{isActive ? 'Grounded' : 'Locate'}</span>
+                                    <span>{isActive ? 'Pinned' : 'Locate'}</span>
                                   </button>
                                 )}
 
                                 {comparison?.status === 'increased' && (
                                   <span
-                                    className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
-                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                    className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 tabular-nums"
+                                    title={`Previous: Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
                                   >
-                                    <TrendingUp className="w-3 h-3 text-rose-400" />
+                                    <TrendingUp className="w-3 h-3 text-rose-500" />
                                     <span>+{comparison.diff_percentage}% (+Rs. {comparison.diff_amount})</span>
                                   </span>
                                 )}
 
                                 {comparison?.status === 'decreased' && (
                                   <span
-                                    className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
-                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                    className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 tabular-nums"
+                                    title={`Previous: Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
                                   >
-                                    <TrendingDown className="w-3 h-3 text-emerald-400" />
+                                    <TrendingDown className="w-3 h-3 text-emerald-500" />
                                     <span>{comparison.diff_percentage}% (-Rs. {Math.abs(comparison.diff_amount)})</span>
                                   </span>
                                 )}
 
                                 {comparison?.status === 'new' && (
-                                  <span className="text-[10px] text-blue-300/90 bg-blue-950/40 border border-blue-800/40 px-1.5 py-0.5 rounded">
+                                  <span className="text-[10px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium">
                                     New SKU
                                   </span>
                                 )}
                               </div>
 
                               {item.is_illegible && (
-                                <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5 font-medium px-1">
                                   ⚠️ Torn or illegible field detected
                                 </span>
                               )}
                               {item.flagReason && !item.is_illegible && (
-                                <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5 font-medium px-1">
                                   ⚠️ {item.flagReason}
                                 </span>
                               )}
                             </td>
 
-                          {/* Batch & Expiry */}
-                          <td className="p-2">
-                            <div className="space-y-1">
+                            {/* Batch & Expiry */}
+                            <td className="p-2">
+                              <div className="space-y-1">
+                                <input
+                                  type="text"
+                                  value={item.batch_no || ''}
+                                  onChange={(e) => handleItemChange(item.id!, 'batch_no', e.target.value)}
+                                  placeholder="Batch"
+                                  className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-0.5 text-[11px] text-slate-700 dark:text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                />
+                                <input
+                                  type="text"
+                                  value={item.expiry_date || ''}
+                                  onChange={(e) => handleItemChange(item.id!, 'expiry_date', e.target.value)}
+                                  placeholder="MM/YY"
+                                  className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-0.5 text-[11px] text-slate-500 dark:text-zinc-400 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                />
+                              </div>
+                            </td>
+
+                            {/* Billed Qty */}
+                            <td className="p-2 text-center">
+                              <input
+                                type="number"
+                                step="any"
+                                value={item.quantity ?? ''}
+                                placeholder="-"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-center text-slate-900 dark:text-white font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
+
+                            {/* Bonus / Free Qty */}
+                            <td className="p-2 text-center">
+                              <input
+                                type="number"
+                                step="any"
+                                value={item.free_quantity ?? ''}
+                                placeholder="0"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'free_quantity', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-center text-teal-700 dark:text-teal-400 font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                title="Free Issue / Bonus stock (F.O.C.)"
+                              />
+                            </td>
+
+                            {/* Unit */}
+                            <td className="p-2 text-center">
                               <input
                                 type="text"
-                                value={item.batch_no || ''}
-                                onChange={(e) => handleItemChange(item.id!, 'batch_no', e.target.value)}
-                                placeholder="B.No (e.g. GS881)"
-                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-300 font-mono focus:outline-none focus:border-emerald-500"
+                                value={item.unit || 'box'}
+                                onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
+                                placeholder="box"
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-center text-slate-600 dark:text-zinc-400 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
                               />
+                            </td>
+
+                            {/* Wholesale Unit Price */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.unit_price ?? ''}
+                                placeholder="Cost"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-1 text-right text-slate-900 dark:text-white font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
+
+                            {/* Retail / MRP Price */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.retail_price ?? ''}
+                                placeholder="MRP"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'retail_price', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-1 text-right text-slate-500 dark:text-zinc-400 font-mono text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
+
+                            {/* Trade Discount % */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={item.discount_percent ?? ''}
+                                placeholder="0%"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'discount_percent', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-right text-teal-700 dark:text-teal-400 font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
+
+                            {/* Net Total */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.total ?? ''}
+                                placeholder="-"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
+                                }}
+                                className={`w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-1 text-right font-mono font-bold tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                  item.isFlagged
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-slate-900 dark:text-white'
+                                }`}
+                              />
+                            </td>
+
+                            {/* Action Delete */}
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRow(item.id!)}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                title="Delete Row"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            {/* Standard Description */}
+                            <td className="p-2">
                               <input
                                 type="text"
-                                value={item.expiry_date || ''}
-                                onChange={(e) => handleItemChange(item.id!, 'expiry_date', e.target.value)}
-                                placeholder="Exp (MM/YY)"
-                                className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-400 font-mono focus:outline-none focus:border-emerald-500"
+                                value={item.name}
+                                onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
+                                placeholder="Item name (සිමෙන්ති / Cable / Pipe)"
+                                className={`w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded-lg px-2 py-1 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors ${
+                                  item.isFlagged ? 'font-semibold text-amber-600 dark:text-amber-400' : ''
+                                }`}
                               />
-                            </div>
-                          </td>
+                              
+                              {/* Visual Grounding & Price Creep Badges */}
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1 px-1">
+                                {item.bounding_box && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveItemIndex(idx);
+                                    }}
+                                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 transition-all ios-pressable ${
+                                      isActive
+                                        ? 'bg-emerald-500 text-white font-bold shadow-sm'
+                                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                                    }`}
+                                    title="View on original bill photo"
+                                  >
+                                    <Target className="w-2.5 h-2.5" />
+                                    <span>{isActive ? 'Pinned' : 'Locate'}</span>
+                                  </button>
+                                )}
 
-                          {/* Billed Qty */}
-                          <td className="p-2 text-center">
-                            <input
-                              type="number"
-                              step="any"
-                              value={item.quantity ?? ''}
-                              placeholder="-"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
+                                {comparison?.status === 'increased' && (
+                                  <span
+                                    className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 tabular-nums"
+                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                  >
+                                    <TrendingUp className="w-3 h-3 text-rose-500" />
+                                    <span>+{comparison.diff_percentage}% (+Rs. {comparison.diff_amount})</span>
+                                  </span>
+                                )}
 
-                          {/* Bonus / Free Qty */}
-                          <td className="p-2 text-center">
-                            <input
-                              type="number"
-                              step="any"
-                              value={item.free_quantity ?? ''}
-                              placeholder="0"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'free_quantity', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-teal-500/40 rounded px-1.5 py-1.5 text-center text-teal-300 font-mono focus:outline-none focus:border-teal-400"
-                              title="Free Issue / Bonus stock (F.O.C.)"
-                            />
-                          </td>
+                                {comparison?.status === 'decreased' && (
+                                  <span
+                                    className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 tabular-nums"
+                                    title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
+                                  >
+                                    <TrendingDown className="w-3 h-3 text-emerald-500" />
+                                    <span>{comparison.diff_percentage}% (-Rs. {Math.abs(comparison.diff_amount)})</span>
+                                  </span>
+                                )}
 
-                          {/* Unit */}
-                          <td className="p-2 text-center">
-                            <input
-                              type="text"
-                              value={item.unit || 'box'}
-                              onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
-                              placeholder="strip/box"
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1 py-1.5 text-center text-slate-300 text-xs font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
+                                {comparison?.status === 'new' && (
+                                  <span className="text-[10px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium">
+                                    New SKU
+                                  </span>
+                                )}
+                              </div>
 
-                          {/* Trade / Cost Unit Price */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.unit_price ?? ''}
-                              placeholder="Cost"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
-
-                          {/* Retail / MRP Price */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.retail_price ?? ''}
-                              placeholder="MRP"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'retail_price', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1.5 py-1.5 text-right text-slate-300 font-mono text-xs focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
-
-                          {/* Trade Discount % */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={item.discount_percent ?? ''}
-                              placeholder="0%"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'discount_percent', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-1 py-1.5 text-right text-teal-300 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
-
-                          {/* Net Total */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.total ?? ''}
-                              placeholder="-"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
-                              }}
-                              className={`w-full bg-slate-950/80 border rounded px-1.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
-                                item.isFlagged
-                                  ? 'border-amber-500 text-amber-300 bg-amber-950/40'
-                                  : 'border-slate-700 text-emerald-400'
-                              }`}
-                            />
-                          </td>
-
-                          {/* Action Delete */}
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRow(item.id!)}
-                              className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
-                              title="Delete Row"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          {/* Standard Description */}
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={(e) => handleItemChange(item.id!, 'name', e.target.value)}
-                              placeholder="Item name (සිමෙන්ති / Cable / Pipe)"
-                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-emerald-500 ${
-                                item.isFlagged ? 'border-amber-500/60 font-semibold' : 'border-slate-700'
-                              }`}
-                            />
-                            
-                            {/* Visual Grounding & Price Creep Badges */}
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              {item.bounding_box && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveItemIndex(idx);
-                                  }}
-                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
-                                    isActive
-                                      ? 'bg-emerald-500 text-white font-bold'
-                                      : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900'
-                                  }`}
-                                  title="View on original bill photo"
-                                >
-                                  <Target className="w-2.5 h-2.5" />
-                                  <span>{isActive ? 'Grounded' : 'Locate'}</span>
-                                </button>
-                              )}
-
-                              {comparison?.status === 'increased' && (
-                                <span
-                                  className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
-                                  title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
-                                >
-                                  <TrendingUp className="w-3 h-3 text-rose-400" />
-                                  <span>+{comparison.diff_percentage}% (+Rs. {comparison.diff_amount})</span>
+                              {item.is_illegible && (
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5 font-medium px-1">
+                                  ⚠️ Torn or illegible field detected on bill
                                 </span>
                               )}
-
-                              {comparison?.status === 'decreased' && (
-                                <span
-                                  className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1"
-                                  title={`Was Rs. ${comparison.previous_price.toLocaleString('en-LK')} on ${comparison.previous_date}`}
-                                >
-                                  <TrendingDown className="w-3 h-3 text-emerald-400" />
-                                  <span>{comparison.diff_percentage}% (-Rs. {Math.abs(comparison.diff_amount)})</span>
+                              {item.flagReason && !item.is_illegible && (
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 block mt-0.5 font-medium px-1">
+                                  ⚠️ {item.flagReason}
                                 </span>
                               )}
+                            </td>
 
-                              {comparison?.status === 'new' && (
-                                <span className="text-[10px] text-blue-300/90 bg-blue-950/40 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                                  New SKU
-                                </span>
-                              )}
-                            </div>
+                            {/* Standard Qty */}
+                            <td className="p-2 text-center">
+                              <input
+                                type="number"
+                                step="any"
+                                value={item.quantity ?? ''}
+                                placeholder="-"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-center text-slate-900 dark:text-white font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
 
-                            {item.is_illegible && (
-                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                                ⚠️ Torn or illegible field detected on bill (Null guardrail active)
-                              </span>
-                            )}
-                            {item.flagReason && !item.is_illegible && (
-                              <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">
-                                ⚠️ {item.flagReason}
-                              </span>
-                            )}
-                          </td>
+                            {/* Standard Unit */}
+                            <td className="p-2 text-center">
+                              <input
+                                type="text"
+                                value={item.unit || 'nos'}
+                                onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
+                                placeholder="nos"
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1 py-1 text-center text-slate-600 dark:text-zinc-400 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
 
-                          {/* Standard Qty */}
-                          <td className="p-2 text-center">
-                            <input
-                              type="number"
-                              step="any"
-                              value={item.quantity ?? ''}
-                              placeholder="-"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'quantity', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
+                            {/* Standard Unit Price */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.unit_price ?? ''}
+                                placeholder="-"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
+                                }}
+                                className="w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-1 text-right text-slate-900 dark:text-white font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </td>
 
-                          {/* Standard Unit */}
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              value={item.unit || 'nos'}
-                              onChange={(e) => handleItemChange(item.id!, 'unit', e.target.value)}
-                              placeholder="nos/pkt/cube"
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2 py-1.5 text-center text-slate-300 text-xs font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
+                            {/* Standard Total */}
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.total ?? ''}
+                                placeholder="-"
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
+                                }}
+                                className={`w-full bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.05] focus:bg-white dark:focus:bg-zinc-800 rounded px-1.5 py-1 text-right font-mono font-bold tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                  item.isFlagged
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-slate-900 dark:text-white'
+                                }`}
+                              />
+                            </td>
 
-                          {/* Standard Unit Price */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.unit_price ?? ''}
-                              placeholder="-"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'unit_price', val === '' ? null : parseFloat(val));
-                              }}
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded px-2.5 py-1.5 text-right text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </td>
-
-                          {/* Standard Total */}
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.total ?? ''}
-                              placeholder="-"
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                handleItemChange(item.id!, 'total', val === '' ? null : parseFloat(val));
-                              }}
-                              className={`w-full bg-slate-950/80 border rounded px-2.5 py-1.5 text-right font-mono font-bold focus:outline-none focus:border-emerald-500 ${
-                                item.isFlagged
-                                  ? 'border-amber-500 text-amber-300 bg-amber-950/40'
-                                  : 'border-slate-700 text-emerald-400'
-                              }`}
-                            />
-                          </td>
-
-                          {/* Action Delete */}
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRow(item.id!)}
-                              className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
-                              title="Delete Row"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </>
-                      )}
-                    </tr>
+                            {/* Action Delete */}
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRow(item.id!)}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                title="Delete Row"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
                     );
                   })}
 
                   {items.length === 0 && (
                     <tr>
-                      <td colSpan={category === 'Pharmacy' ? 11 : 6} className="text-center py-8 text-slate-400 text-xs">
-                        No line items found. Click "Add Row" to enter items manually.
+                      <td colSpan={category === 'Pharmacy' ? 11 : 6} className="text-center py-8 text-slate-400 dark:text-zinc-500 text-xs">
+                        No line items found. Click &quot;Add Row&quot; to enter items manually.
                       </td>
                     </tr>
                   )}
@@ -1106,26 +1069,26 @@ export function ScreenReview({
               </table>
             </div>
 
-            {/* Total Footer Row */}
-            <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
+            {/* Total Summary Footer */}
+            <div className="p-4 bg-black/[0.02] dark:bg-white/[0.02] border-t border-black/[0.04] dark:border-white/[0.06] flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={handleAddRow}
-                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold"
+                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Another Item
               </button>
 
               <div className="flex items-center gap-4 text-right">
                 <div>
-                  <span className="text-[11px] text-slate-400 block">Calculated Total</span>
-                  <span className="font-mono text-sm font-bold text-slate-200">
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Calculated Total</span>
+                  <span className="font-mono text-sm font-bold text-slate-800 dark:text-zinc-200 tabular-nums">
                     Rs. {calculatedTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
 
-                <div className="pl-4 border-l border-slate-800">
-                  <span className="text-[11px] text-slate-400 block">Bill Grand Total (LKR)</span>
+                <div className="pl-4 border-l border-black/[0.06] dark:border-white/[0.08]">
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Bill Grand Total (LKR)</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold text-slate-400">Rs.</span>
                     <input
@@ -1133,10 +1096,10 @@ export function ScreenReview({
                       step="0.01"
                       value={grandTotalInput}
                       onChange={(e) => setGrandTotalInput(parseFloat(e.target.value) || 0)}
-                      className={`w-36 bg-slate-950 border rounded px-2.5 py-1 text-right text-base font-extrabold font-mono focus:outline-none ${
+                      className={`w-36 bg-slate-100 dark:bg-zinc-800 border rounded-xl px-3 py-1 text-right text-base font-bold font-mono tabular-nums focus:outline-none focus:ring-2 ${
                         hasDiscrepancy
-                          ? 'border-amber-500 text-amber-300 bg-amber-950/30'
-                          : 'border-emerald-500 text-emerald-400'
+                          ? 'border-amber-500 text-amber-700 dark:text-amber-300 focus:ring-amber-500'
+                          : 'border-emerald-500 text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
                       }`}
                     />
                   </div>
@@ -1145,37 +1108,37 @@ export function ScreenReview({
             </div>
           </div>
 
-          {/* Confidence Notes */}
+          {/* AI Notes */}
           {initialData.confidence_notes && (
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div className="p-3.5 ios-glass rounded-2xl border border-black/[0.04] dark:border-white/[0.06] text-xs text-slate-500 dark:text-zinc-400 flex items-start gap-2.5">
+              <Sparkles className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
               <p>
-                <span className="font-semibold text-slate-300">Gemini Flash AI Notes:</span>{' '}
+                <span className="font-semibold text-slate-700 dark:text-zinc-300">Gemini Flash AI Notes:</span>{' '}
                 {initialData.confidence_notes}
               </p>
             </div>
           )}
 
-          {/* BOTTOM ACTION BAR */}
-          <div className="sticky bottom-3 z-30 pt-3">
-            <div className="bg-slate-950/95 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
+          {/* BOTTOM FLOATING ACTION DOCK */}
+          <div className="sticky bottom-4 z-30 pt-3">
+            <div className="ios-glass border border-black/[0.08] dark:border-white/[0.12] p-2.5 rounded-full shadow-2xl flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={onDiscard}
-                className="px-4 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                className="px-5 py-2.5 rounded-full text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors ios-pressable"
               >
-                <RotateCcw className="w-4 h-4 text-amber-400" />
-                <span>Discard / Retake</span>
+                <RotateCcw className="w-4 h-4 text-amber-500" />
+                <span>Discard</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleConfirmSave}
                 disabled={isSaving}
-                className="flex-1 sm:flex-initial px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm sm:text-base font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 transition-all active:scale-[0.99]"
+                className="flex-1 sm:flex-initial px-7 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all ios-pressable"
               >
-                <Save className="w-5 h-5" />
-                <span>Confirm &amp; Save to Records</span>
+                <Save className="w-4 h-4" />
+                <span>Approve &amp; Save Record</span>
               </button>
             </div>
           </div>

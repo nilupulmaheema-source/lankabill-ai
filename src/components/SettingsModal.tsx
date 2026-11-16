@@ -45,7 +45,7 @@ export function SettingsModal({ isOpen, onClose, onSettingsSaved }: SettingsModa
     if (onSettingsSaved) onSettingsSaved();
     setTimeout(() => {
       onClose();
-    }, 900);
+    }, 800);
   };
 
   const copySqlToClipboard = () => {
@@ -97,153 +97,141 @@ ALTER PUBLICATION supabase_realtime ADD TABLE invoices;`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="ios-glass border border-black/[0.08] dark:border-white/[0.12] rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/50">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06] dark:border-white/[0.08]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Key className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">System &amp; API Configuration</h3>
-              <p className="text-xs text-slate-400">Gemini 2.5 Flash Vision &amp; Supabase Cloud Sync</p>
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Settings &amp; Keys</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">Gemini Flash &amp; Cloud Database</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex border-b border-slate-800 bg-slate-950/30">
-          <button
-            type="button"
-            onClick={() => setActiveTab('keys')}
-            className={`flex-1 py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'keys'
-                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            API Keys &amp; Credentials
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('sql')}
-            className={`flex-1 py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'sql'
-                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Database className="w-4 h-4" />
-            Supabase SQL Setup
-          </button>
+        {/* Tab Selector (iOS Segmented Pill) */}
+        <div className="p-3 border-b border-black/[0.04] dark:border-white/[0.06]">
+          <div className="flex p-1 rounded-full bg-slate-200/60 dark:bg-zinc-800/80 border border-black/[0.04] dark:border-white/[0.06]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('keys')}
+              className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ios-pressable ${
+                activeTab === 'keys'
+                  ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Credentials</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('sql')}
+              className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ios-pressable ${
+                activeTab === 'sql'
+                  ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Database SQL</span>
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {activeTab === 'keys' ? (
             <form id="settings-form" onSubmit={handleSave} className="space-y-4">
-              <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 text-xs text-slate-300 flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-800/60 border border-black/[0.04] dark:border-white/[0.06] text-xs text-slate-600 dark:text-zinc-300 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                 <p>
-                  Keys are securely stored in your browser storage. If not set, the app runs in{' '}
-                  <span className="text-emerald-300 font-semibold">Simulated Benchmark Mode</span> with realistic Sri Lankan hardware &amp; pharmacy bill intelligence.
+                  Keys are stored on this device only. If empty, the app runs in{' '}
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Offline Benchmark Mode</span> with full sample data.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  Google Gemini API Key (Gemini Flash Vision)
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Google Gemini API Key
                 </label>
                 <input
                   type="password"
                   placeholder="AIzaSy..."
                   value={geminiApiKey}
                   onChange={(e) => setGeminiApiKey(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white font-mono transition-all focus:outline-none"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Get your free Gemini Flash API key at{' '}
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-emerald-400 underline hover:text-emerald-300"
-                  >
-                    Google AI Studio
-                  </a>
-                </p>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80">
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-blue-400" />
-                  Supabase Project URL
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-blue-500" />
+                  Supabase URL
                 </label>
                 <input
                   type="text"
                   placeholder="https://your-project.supabase.co"
                   value={supabaseUrl}
                   onChange={(e) => setSupabaseUrl(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white font-mono transition-all focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Supabase Anon Public API Key
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Supabase Anon Key
                 </label>
                 <input
                   type="password"
                   placeholder="eyJhbGciOiJIUzI1NiIsIn..."
                   value={supabaseAnonKey}
                   onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white font-mono transition-all focus:outline-none"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Leave blank to use the built-in offline-first LocalStorage database.
-                </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Store / Business Name
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Store / Retail Business Name
                 </label>
                 <input
                   type="text"
                   placeholder="e.g. Royal Care Pharmacy / Nawala Hardware"
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-100 dark:bg-zinc-800/80 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white transition-all focus:outline-none"
                 />
               </div>
             </form>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-300">
-                  Run this in Supabase SQL Editor:
+                <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400">
+                  SQL Schema:
                 </span>
                 <button
                   type="button"
                   onClick={copySqlToClipboard}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors shadow"
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors shadow-sm ios-pressable"
                 >
                   {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedSql ? 'Copied to Clipboard!' : 'Copy Schema SQL'}
+                  {copiedSql ? 'Copied' : 'Copy SQL'}
                 </button>
               </div>
 
-              <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-[11px] text-emerald-400 font-mono overflow-x-auto max-h-[300px]">
-{`-- 1. Create Invoices Table
+              <pre className="bg-slate-100 dark:bg-zinc-900 p-4 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] text-[11px] text-emerald-700 dark:text-emerald-400 font-mono overflow-x-auto max-h-[280px]">
+{`-- 1. Invoices Table
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vendor_name VARCHAR(255) NOT NULL,
@@ -251,41 +239,25 @@ CREATE TABLE IF NOT EXISTS invoices (
     invoice_date DATE DEFAULT CURRENT_DATE,
     category VARCHAR(50) DEFAULT 'General',
     grand_total NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
-    calculated_total NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
-    discrepancy NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
     status VARCHAR(50) DEFAULT 'Pending Verification',
     created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 2. Line Items
-CREATE TABLE IF NOT EXISTS invoice_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    quantity NUMERIC(10, 2) NOT NULL,
-    unit VARCHAR(30) DEFAULT 'nos',
-    unit_price NUMERIC(12, 2) NOT NULL,
-    total NUMERIC(14, 2) NOT NULL
-);
-
--- 3. Enable Real-Time
-ALTER PUBLICATION supabase_realtime ADD TABLE invoices;`}
+);`}
               </pre>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span>Local &amp; End-to-End Encrypted</span>
+        <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+            <Shield className="w-4 h-4 text-emerald-500" />
+            <span>Encrypted on Device</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
             >
               Cancel
             </button>
@@ -293,11 +265,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE invoices;`}
               <button
                 type="submit"
                 form="settings-form"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow-lg shadow-emerald-950/50"
+                className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-full transition-colors shadow-sm ios-pressable"
               >
                 {savedSuccess ? (
                   <>
-                    <Check className="w-4 h-4" /> Saved!
+                    <Check className="w-3.5 h-3.5" /> Saved!
                   </>
                 ) : (
                   'Save Settings'

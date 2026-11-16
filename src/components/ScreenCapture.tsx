@@ -9,7 +9,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  FileText,
   ArrowRight,
   ShieldCheck,
   Languages,
@@ -75,16 +74,13 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
     startTimer();
 
     try {
-      // 1. Client-side compression & format handling (with HEIC support + Document Scanner)
-      setLoadingStep('📷 Optimizing photo for high-speed upload...');
-      const compResult = await compressInvoiceImage(file, 2000, 0.92);
+      // 1. Client-side compression & format handling (with HEIC support)
+      setLoadingStep('Optimizing photo for high-speed upload...');
+      const compResult = await compressInvoiceImage(file, 1600, 0.85);
       setCompressionInfo(compResult);
 
-      if (compResult.scannerEnhanced) {
-        setLoadingStep('🔍 Document scanner enhanced! Reading with Gemini Flash...');
-      } else {
-        setLoadingStep('Reading bill with Gemini Flash...');
-      }
+      // 2. Call Gemini Vision API Route
+      setLoadingStep('Reading bill with Gemini Flash...');
       const userSettings = getUserSettings();
 
       const controller = new AbortController();
@@ -101,48 +97,40 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             userApiKey: userSettings.geminiApiKey || undefined,
           }),
         });
-
         clearTimeout(timeoutId);
+
         const json = await response.json();
+        stopTimer();
+        setIsProcessing(false);
 
-        if (!response.ok || !json.success) {
-          throw new Error(json.error || 'Failed to extract bill data.');
+        if (json.success && json.data) {
+          onExtractionComplete({
+            extraction: json.data,
+            imageUrl: json.displayImageUrl || compResult.base64Data,
+            processingTimeMs: json.processingTimeMs || Math.round(loadingTimer * 1000),
+            compressionStats: compResult,
+          });
+        } else {
+          setErrorMsg(json.error || 'Failed to extract invoice data. Please try again.');
         }
-
-        setLoadingStep('Structuring itemized inventory & arithmetic check...');
-
-        // Use server-converted JPEG display URL if available (ensures iPhone HEIC photos render in all browsers)
-        const finalImageUrl = json.displayImageUrl || compResult.base64Data;
-
-        onExtractionComplete({
-          extraction: json.data,
-          imageUrl: finalImageUrl,
-          processingTimeMs: json.processingTimeMs || Math.round(loadingTimer * 1000),
-          compressionStats: compResult,
-        });
-      } finally {
+      } catch (fetchErr: any) {
         clearTimeout(timeoutId);
+        stopTimer();
+        setIsProcessing(false);
+        setErrorMsg('Network timeout reaching AI server. Please check internet connection.');
       }
-    } catch (err: any) {
-      console.error('Scan error:', err);
-      const isTimeout = err.name === 'AbortError';
-      setErrorMsg(
-        isTimeout
-          ? 'Scanning timed out after 60s. Please check your network or try again.'
-          : (err.message || 'Error processing bill photo. Please try again.')
-      );
-    } finally {
+    } catch (compErr: any) {
       stopTimer();
       setIsProcessing(false);
+      setErrorMsg(compErr.message || 'Error preparing image for scanning.');
     }
   };
 
-  // Process a benchmark sample bill
   const handleSelectSample = async (sample: SampleBill) => {
     setErrorMsg(null);
     setIsProcessing(true);
     startTimer();
-    setLoadingStep(`Analyzing ${sample.title} with Gemini Flash...`);
+    setLoadingStep(`Loading ${sample.title}...`);
 
     try {
       const response = await fetch('/api/extract', {
@@ -164,7 +152,6 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
     } catch (err: any) {
       stopTimer();
       setIsProcessing(false);
-      // Fallback directly to sample data
       onExtractionComplete({
         extraction: sample.data,
         imageUrl: sample.imageUrl,
@@ -194,77 +181,69 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-8 animate-in fade-in duration-300">
-      {/* Hero Banner for Retail Counter Staff */}
-      <div className="text-center space-y-2.5">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-          <span>Tailored for Sri Lankan Pharmacies, Hardware &amp; Distributors</span>
+    <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12 space-y-8 animate-in fade-in duration-300">
+      {/* Apple Styled Hero Heading */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full ios-glass border border-black/[0.06] dark:border-white/[0.08] text-emerald-600 dark:text-emerald-400 text-xs font-semibold shadow-sm">
+          <Zap className="w-3.5 h-3.5 fill-current" />
+          <span>Sri Lankan Retail &amp; Pharmacy AI</span>
         </div>
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Instant Supplier Bill &amp; Chit Scanner
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Scan Bills in Seconds
         </h1>
-        <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
-          Snap a photo of any printed or handwritten bill in English, Sinhala Unicode (සිමෙන්ති, බට), or Singlish. Extracted in under 5 seconds.
+        <p className="text-sm sm:text-base text-slate-500 dark:text-zinc-400 max-w-lg mx-auto font-normal leading-relaxed">
+          Snap any handwritten or printed receipt in Sinhala Unicode (සිමෙන්ති, බට), Singlish, or English. Instant arithmetic validation and price check.
         </p>
       </div>
 
       {/* Error Notice */}
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-red-950/50 border border-red-500/40 text-red-200 text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-200 text-sm flex items-start gap-3 shadow-sm">
+          <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold">Processing Failed</p>
-            <p className="text-xs text-red-300 mt-0.5">{errorMsg}</p>
+            <p className="text-xs text-rose-600 dark:text-rose-300 mt-0.5">{errorMsg}</p>
           </div>
         </div>
       )}
 
-      {/* Processing Animated Skeleton State */}
+      {/* Processing State: Apple Document Scanner Look */}
       {isProcessing ? (
-        <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-8 sm:p-12 text-center shadow-2xl relative overflow-hidden">
-          {/* Top scanning laser effect */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse" />
+        <div className="ios-glass border border-black/[0.06] dark:border-white/[0.08] rounded-3xl p-8 sm:p-12 text-center shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent animate-pulse" />
 
-          <div className="max-w-md mx-auto space-y-6">
-            {/* Spinning AI Core Indicator */}
-            <div className="relative w-20 h-20 mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
-              <div className="absolute inset-2 rounded-full border-4 border-teal-500/30 border-b-teal-400 animate-spin [animation-direction:reverse] [animation-duration:1.5s]" />
+          <div className="max-w-sm mx-auto space-y-6">
+            {/* Spinning Indicator */}
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 rounded-full border-[3px] border-emerald-500/20 border-t-emerald-500 animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-emerald-400 animate-pulse" />
+                <Sparkles className="w-6 h-6 text-emerald-500 animate-pulse" />
               </div>
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-800 border border-slate-700 text-emerald-400 font-mono text-xs mb-2">
-                <Clock className="w-3.5 h-3.5 animate-spin" />
-                <span>Elapsed: {loadingTimer.toFixed(1)}s (Target: &lt; 5s)</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-mono text-xs mb-2">
+                <Clock className="w-3.5 h-3.5 text-emerald-500 animate-spin" />
+                <span>Elapsed: {loadingTimer.toFixed(1)}s</span>
               </div>
-              <h3 className="text-lg font-bold text-white tracking-wide">
-                Reading bill with Gemini Flash...
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                Reading bill with Gemini Flash
               </h3>
-              <p className="text-xs text-slate-400 mt-1 font-medium">{loadingStep}</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 font-normal">{loadingStep}</p>
             </div>
 
-            {/* Skeleton Line Items Placeholder */}
-            <div className="space-y-2.5 pt-2">
-              <div className="h-4 bg-slate-800 rounded animate-pulse w-3/4 mx-auto" />
-              <div className="h-4 bg-slate-800 rounded animate-pulse w-5/6 mx-auto" />
-              <div className="h-4 bg-slate-800 rounded animate-pulse w-2/3 mx-auto" />
+            {/* Skeleton Line Items */}
+            <div className="space-y-2 pt-2">
+              <div className="h-3 bg-black/[0.04] dark:bg-white/[0.06] rounded-full animate-pulse w-3/4 mx-auto" />
+              <div className="h-3 bg-black/[0.04] dark:bg-white/[0.06] rounded-full animate-pulse w-5/6 mx-auto" />
+              <div className="h-3 bg-black/[0.04] dark:bg-white/[0.06] rounded-full animate-pulse w-1/2 mx-auto" />
             </div>
 
             {compressionInfo && (
-              <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-800 flex items-center justify-center gap-2">
+              <div className="text-[11px] text-slate-400 dark:text-zinc-500 pt-3 border-t border-black/[0.04] dark:border-white/[0.06] flex items-center justify-center gap-2">
                 <span>Compressed to {formatBytes(compressionInfo.compressedSizeBytes)}</span>
                 <span>•</span>
                 <span>{compressionInfo.width}×{compressionInfo.height}px</span>
-                {compressionInfo.scannerEnhanced && (
-                  <>
-                    <span>•</span>
-                    <span className="text-emerald-400 font-semibold">📄 Scanner Enhanced ({compressionInfo.scannerProcessingMs}ms)</span>
-                  </>
-                )}
               </div>
             )}
           </div>
@@ -272,9 +251,8 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       ) : (
         /* Capture Controls */
         <div className="space-y-6">
-          {/* PRIMARY HIGH-CONTRAST MOBILE CAPTURE BUTTON */}
-          <div className="space-y-2">
-            {/* Hidden Mobile Camera Input */}
+          {/* PRIMARY APPLE STYLE MOBILE CAPTURE CARD */}
+          <div>
             <input
               ref={fileInputRef}
               type="file"
@@ -291,20 +269,20 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-white font-extrabold text-lg sm:text-xl py-5 px-6 rounded-2xl shadow-xl shadow-emerald-950/60 border border-emerald-400/30 flex items-center justify-center gap-3 transition-all"
+              className="w-full group bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl p-6 sm:p-7 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-4 transition-all ios-pressable border border-emerald-400/20"
             >
-              <div className="p-2.5 bg-slate-950/30 rounded-xl">
-                <Camera className="w-7 h-7 sm:w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                <Camera className="w-7 h-7 text-white" />
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-2">
-                  <span>Scan Bill / Capture Photo</span>
-                  <span className="text-xs font-semibold bg-emerald-400/20 text-emerald-200 px-2 py-0.5 rounded-full border border-emerald-300/30">
-                    4G Optimized
+                  <span className="font-bold text-lg sm:text-xl tracking-tight">Scan Bill with Camera</span>
+                  <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
+                    Fast 4G
                   </span>
                 </div>
-                <p className="text-xs font-medium text-emerald-100/90 font-normal">
-                  Tap to open mobile camera or gallery
+                <p className="text-xs text-emerald-100 font-normal mt-0.5">
+                  Tap to launch phone camera or pick from gallery
                 </p>
               </div>
             </button>
@@ -317,10 +295,10 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => desktopInputRef.current?.click()}
-            className={`cursor-pointer border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center transition-all ${
+            className={`cursor-pointer ios-glass rounded-3xl p-6 text-center transition-all border ios-pressable ${
               dragActive
                 ? 'border-emerald-500 bg-emerald-500/10 scale-[1.01]'
-                : 'border-slate-700 hover:border-slate-500 bg-slate-900/60 hover:bg-slate-900'
+                : 'border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.12] dark:hover:border-white/[0.16]'
             }`}
           >
             <input
@@ -334,95 +312,89 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
                 }
               }}
             />
-            <div className="flex flex-col items-center justify-center gap-2.5">
-              <div className="p-3 rounded-full bg-slate-800 text-slate-300">
-                <Upload className="w-5 h-5" />
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-600 dark:text-zinc-300">
+                <Upload className="w-4 h-4" />
               </div>
-              <p className="text-sm font-semibold text-slate-200">
-                Or drag &amp; drop an invoice photo / receipt from computer
+              <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                Drop invoice photo or PDF here
               </p>
-              <p className="text-xs text-slate-500">
-                Supports iPhone camera (HEIC), JPEG, PNG, WebP, and PDF with automatic optimization
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                Supports iPhone HEIC, JPEG, PNG, and PDF files
               </p>
             </div>
           </div>
 
-          {/* SRI LANKA BENCHMARK SAMPLES (1-Click Instant Testing) */}
-          <div className="pt-4 border-t border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Languages className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Try Benchmark Sri Lankan Bills (1-Click Test)
+          {/* SRI LANKA BENCHMARK SAMPLES (Apple Grouped Inset Style) */}
+          <div className="pt-2 space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
+                <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  1-Click Benchmark Samples
                 </span>
               </div>
-              <span className="text-[11px] text-slate-400 hidden sm:inline">
-                No physical bill needed
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                Instant test without paper
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="ios-glass rounded-3xl border border-black/[0.06] dark:border-white/[0.08] divide-y divide-black/[0.05] dark:divide-white/[0.06] overflow-hidden shadow-sm">
               {SAMPLE_BILLS.map((sample) => (
                 <button
                   key={sample.id}
                   type="button"
                   onClick={() => handleSelectSample(sample)}
-                  className={`text-left p-3.5 rounded-xl border transition-all relative group flex flex-col justify-between ${
-                    sample.hasDiscrepancy
-                      ? 'bg-amber-950/20 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-950/40'
-                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
-                  }`}
+                  className="w-full text-left p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors flex items-center justify-between gap-3 group ios-pressable"
                 >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
                       <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           sample.category === 'Hardware'
-                            ? 'bg-amber-500/20 text-amber-300'
-                            : 'bg-teal-500/20 text-teal-300'
+                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                            : 'bg-teal-500/10 text-teal-700 dark:text-teal-400'
                         }`}
                       >
                         {sample.category}
                       </span>
                       {sample.hasDiscrepancy && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
-                          Math Diff Test
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400">
+                          Math Check Test
                         </span>
                       )}
                     </div>
-                    <p className="font-semibold text-xs text-slate-100 group-hover:text-emerald-400 transition-colors line-clamp-1">
+                    <p className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                       {sample.title}
                     </p>
-                    <p className="text-[11px] text-slate-400 line-clamp-2">
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
                       {sample.description}
                     </p>
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-300">
-                    <span className="font-mono font-bold text-emerald-400">
+                  <div className="flex items-center gap-2.5 flex-shrink-0 text-right">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white tabular-nums">
                       Rs. {sample.data.grand_total.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="flex items-center gap-1 text-slate-400 group-hover:text-white transition-colors">
-                      Test <ArrowRight className="w-3 h-3" />
-                    </span>
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Retail Counter Trust Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 text-[11px] text-slate-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>Sinhala, English &amp; Singlish</span>
+          {/* Counter Trust Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-2xl ios-glass border border-black/[0.04] dark:border-white/[0.06] text-[11px] text-slate-600 dark:text-zinc-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+              <span>Sinhala &amp; Singlish</span>
             </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 text-[11px] text-slate-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>Arithmetic Integrity Check</span>
+            <div className="flex items-center gap-2 p-2.5 rounded-2xl ios-glass border border-black/[0.04] dark:border-white/[0.06] text-[11px] text-slate-600 dark:text-zinc-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+              <span>Math Integrity Check</span>
             </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 text-[11px] text-slate-300 col-span-2 sm:col-span-1">
-              <Zap className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 rounded-2xl ios-glass border border-black/[0.04] dark:border-white/[0.06] text-[11px] text-slate-600 dark:text-zinc-400 col-span-2 sm:col-span-1">
+              <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               <span>Gemini Flash Vision</span>
             </div>
           </div>

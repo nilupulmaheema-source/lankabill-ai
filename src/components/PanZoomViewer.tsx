@@ -58,7 +58,6 @@ export function PanZoomViewer({
 
   // Mouse drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only drag when clicking canvas background or image, not buttons
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
@@ -103,67 +102,67 @@ export function PanZoomViewer({
   const groundedCount = items?.filter((it) => it.bounding_box && it.bounding_box.length === 4).length || 0;
 
   return (
-    <div className="relative w-full h-full min-h-[320px] md:min-h-[500px] flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-inner select-none">
-      {/* Top Floating Controls Bar */}
+    <div className="relative w-full h-full min-h-[340px] md:min-h-[500px] flex flex-col bg-slate-100 dark:bg-[#0d0f18] border border-black/[0.06] dark:border-white/[0.08] rounded-3xl overflow-hidden shadow-sm select-none">
+      {/* Top Floating Apple Glass Pill Bar */}
       <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/80 text-xs font-medium text-slate-200 pointer-events-auto shadow-md">
+        <div className="flex items-center gap-2 ios-glass px-3 py-1.5 rounded-full border border-black/[0.06] dark:border-white/[0.1] text-xs font-semibold text-slate-800 dark:text-zinc-200 pointer-events-auto shadow-md">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Original Bill Photo</span>
+          <span>Receipt Scan</span>
           {groundedCount > 0 && (
-            <span className="text-emerald-400 font-mono text-[10px] ml-1 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Target className="w-3 h-3 text-emerald-400" />
-              <span>{groundedCount} Grounded</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-mono text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20">
+              <Target className="w-3 h-3 text-emerald-500" />
+              <span>{groundedCount} Pinned</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-950/85 backdrop-blur-md p-1 rounded-lg border border-slate-700/80 pointer-events-auto shadow-md">
+        <div className="flex items-center gap-1 ios-glass p-1 rounded-full border border-black/[0.06] dark:border-white/[0.1] pointer-events-auto shadow-md">
           {groundedCount > 0 && (
             <button
               type="button"
               onClick={() => setShowBoundingBoxes(!showBoundingBoxes)}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ios-pressable ${
                 showBoundingBoxes
-                  ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-emerald-500 text-white'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
-              title={showBoundingBoxes ? 'Hide AI Laser Bounding Boxes' : 'Show AI Laser Bounding Boxes'}
+              title={showBoundingBoxes ? 'Hide Laser Bounding Boxes' : 'Show Laser Bounding Boxes'}
             >
-              {showBoundingBoxes ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {showBoundingBoxes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
             </button>
           )}
 
           <button
             type="button"
             onClick={handleZoomIn}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors ios-pressable"
             title="Zoom In (+)"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleZoomOut}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors ios-pressable"
             title="Zoom Out (-)"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleRotate}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors ios-pressable"
             title="Rotate 90°"
           >
-            <RotateCw className="w-4 h-4" />
+            <RotateCw className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleReset}
-            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
-            title="Reset to Fit"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors ios-pressable"
+            title="Reset View"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -181,27 +180,27 @@ export function PanZoomViewer({
         onTouchEnd={handleTouchEnd}
         className={`relative w-full flex-1 flex items-center justify-center overflow-hidden cursor-${
           isDragging ? 'grabbing' : 'grab'
-        } bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px]`}
+        } bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:20px_20px]`}
       >
         <div
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-            transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+            transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             transformOrigin: 'center center',
           }}
           className="max-w-full max-h-full flex items-center justify-center p-4"
         >
-          {/* Wrapper that hugs the exact rendered dimensions of the image */}
+          {/* Wrapper hugging the exact image dimensions */}
           <div className="relative inline-block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
               alt={alt}
               draggable={false}
-              className="max-h-[65vh] md:max-h-[720px] w-auto object-contain rounded-md shadow-2xl pointer-events-none block"
+              className="max-h-[60vh] md:max-h-[700px] w-auto object-contain rounded-2xl shadow-xl pointer-events-none block border border-black/[0.05] dark:border-white/[0.05]"
             />
 
-            {/* Visual Grounding Bounding Box Overlays (Day 2 Magic Moment) */}
+            {/* Apple Styled Visual Grounding Overlays */}
             {showBoundingBoxes && items && items.length > 0 && (
               <div className="absolute inset-0 pointer-events-auto">
                 {items.map((item, idx) => {
@@ -221,16 +220,16 @@ export function PanZoomViewer({
                         onSelectItem?.(idx);
                       }}
                       style={{ top, left, width, height }}
-                      className={`absolute cursor-pointer transition-all duration-200 rounded ${
+                      className={`absolute cursor-pointer transition-all duration-200 rounded-lg ${
                         isActive
-                          ? 'border-2 border-emerald-400 bg-emerald-400/25 ring-2 ring-emerald-400/60 shadow-[0_0_20px_rgba(52,211,153,0.7)] z-20'
-                          : 'border border-emerald-500/40 bg-emerald-500/10 hover:border-emerald-300 hover:bg-emerald-500/30 z-10'
+                          ? 'border-2 border-emerald-500 bg-emerald-500/20 ring-2 ring-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.5)] z-20'
+                          : 'border border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-400 hover:bg-emerald-500/20 z-10'
                       }`}
                       title={`#${idx + 1} ${item.name} (${item.unit_price ? `Rs. ${item.unit_price}` : ''})`}
                     >
                       {isActive && (
-                        <div className="absolute -top-7 left-0 bg-slate-950/95 text-emerald-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-400 shadow-xl whitespace-nowrap flex items-center gap-1 z-30 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                          <Target className="w-3 h-3 text-emerald-400 animate-pulse" />
+                        <div className="absolute -top-7 left-0 ios-glass text-slate-900 dark:text-white font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/40 shadow-xl whitespace-nowrap flex items-center gap-1.5 z-30 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                          <Target className="w-3 h-3 text-emerald-500 animate-pulse" />
                           <span>#{idx + 1} {item.name.slice(0, 20)}</span>
                         </div>
                       )}
@@ -243,13 +242,13 @@ export function PanZoomViewer({
         </div>
       </div>
 
-      {/* Bottom Hint */}
-      <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[11px] text-slate-400 pointer-events-none">
-        <span className="bg-slate-950/70 backdrop-blur-sm px-2 py-0.5 rounded border border-slate-800">
-          Tip: Tap any box on receipt to jump to row • Pinch to zoom
+      {/* Bottom Hint Pill */}
+      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 pointer-events-none">
+        <span className="ios-glass px-2.5 py-1 rounded-full border border-black/[0.05] dark:border-white/[0.08] shadow-sm">
+          Tap any highlighted box on receipt to jump to row
         </span>
         {rotation > 0 && (
-          <span className="bg-slate-950/70 px-2 py-0.5 rounded border border-slate-800 text-amber-400">
+          <span className="ios-glass px-2.5 py-1 rounded-full border border-black/[0.05] dark:border-white/[0.08] text-amber-500 font-medium">
             Rotated {rotation}°
           </span>
         )}

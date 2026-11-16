@@ -194,12 +194,12 @@ export default function Home() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Toast Notification */}
+    <div className={`min-h-screen flex flex-col ${darkMode ? 'dark bg-[#090a0f] text-slate-100' : 'bg-[#f8fafc] text-slate-900'}`}>
+      {/* Apple Dynamic Island Style Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-4 z-50 animate-in slide-in-from-top duration-300">
-          <div className="bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold border border-emerald-400/40">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-3 fade-in duration-300 pointer-events-none">
+          <div className="ios-glass px-4 py-2 rounded-full shadow-xl border border-emerald-500/30 flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-900 dark:text-white">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>{toastMessage}</span>
           </div>
         </div>
@@ -255,6 +255,40 @@ export default function Home() {
           />
         )}
       </main>
+
+      {/* Apple iOS Floating Mobile Bottom Tab Bar (Thumb-Accessible Ergonomics) */}
+      <div className="sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-auto">
+        <div className="ios-glass border border-black/[0.08] dark:border-white/[0.12] p-1.5 rounded-full shadow-2xl flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('capture')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all ios-pressable ${
+              activeTab === 'capture'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-zinc-400'
+            }`}
+          >
+            <span>📷 Scan</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('ledger')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all ios-pressable ${
+              activeTab === 'ledger'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-zinc-400'
+            }`}
+          >
+            <span>📋 Ledger</span>
+            {invoices.length > 0 && (
+              <span className="px-1.5 py-0.2 bg-black/20 dark:bg-white/20 rounded-full text-[10px] tabular-nums font-bold">
+                {invoices.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Configuration & Settings Modal */}
       <SettingsModal
