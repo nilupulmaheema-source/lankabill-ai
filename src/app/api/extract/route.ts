@@ -320,17 +320,41 @@ export async function POST(req: NextRequest) {
     const responseText = response.text?.trim() || '{}';
     let parsedJson = JSON.parse(responseText);
 
-    // Normalize line items: ensure discount_percent and total are populated
+    // Normalize line items: ensure discount_percent, total, and arithmetic consistency
     if (Array.isArray(parsedJson.items)) {
       parsedJson.items = parsedJson.items.map((it: any) => {
-        const qty = it.quantity != null ? Number(it.quantity) : null;
-        const price = it.unit_price != null ? Number(it.unit_price) : null;
+        let qty = it.quantity != null && !isNaN(Number(it.quantity)) ? Number(it.quantity) : null;
+        const price = it.unit_price != null && !isNaN(Number(it.unit_price)) ? Number(it.unit_price) : null;
         let discPct = it.discount_percent != null && !isNaN(Number(it.discount_percent)) ? Number(it.discount_percent) : 0;
         let lineTotal = it.total != null && !isNaN(Number(it.total)) ? Number(it.total) : null;
 
+        const effectiveMultiplier = (1 - discPct / 100);
+        const netUnitPrice = price != null && effectiveMultiplier > 0 ? price * effectiveMultiplier : price;
+
+        // ════════════════════════════════════════════════════════════════════════
+        // MATHEMATICAL AUTO-RECONCILIATION GUARDRAIL (Zero-Drop & Arithmetic Self-Healing)
+        // If the vision OCR read Qty: 10, but printed line Total is Rs. 153,600.44
+        // and Unit Price is 1,669.57 with 8% discount:
+        // Expected Qty = 153,600.44 / (1669.57 * 0.92) = 100.00
+        // Automatically reconciles faint or dropped dot-matrix zeros (e.g. 10 -> 100, 30 -> 300)
+        // ════════════════════════════════════════════════════════════════════════
+        if (lineTotal != null && lineTotal > 0 && netUnitPrice != null && netUnitPrice > 0) {
+          const derivedQty = lineTotal / netUnitPrice;
+          const roundedDerived = Math.round(derivedQty);
+
+          // If derived quantity is a clean integer and differs from OCR qty by a factor of 10, 100, or clean round
+          if (Math.abs(derivedQty - roundedDerived) < 0.05) {
+            if (qty == null || (qty > 0 && Math.abs(qty - roundedDerived) >= 1 && (roundedDerived % qty === 0 || qty % roundedDerived === 0))) {
+              console.log(`[LankaBill API] Self-Healing Qty Reconciled: ${it.name} Qty ${qty} -> ${roundedDerived} based on printed line total Rs. ${lineTotal}`);
+              qty = roundedDerived;
+            }
+          }
+        }
+
+        // Auto-calculate line total if omitted by model
         if (lineTotal == null && qty != null && price != null) {
           const raw = qty * price;
-          lineTotal = Math.round(raw * (1 - discPct / 100) * 100) / 100;
+          lineTotal = Math.round(raw * effectiveMultiplier * 100) / 100;
         }
 
         return {

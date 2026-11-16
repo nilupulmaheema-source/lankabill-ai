@@ -82,10 +82,26 @@ export function ScreenReview({
     return (initialData.items || []).map((it, idx) => {
       const discPct = it.discount_percent ?? inferredDiscPct ?? 0;
       let lineTotal = it.total ?? null;
+      let qty = it.quantity ?? null;
+      const price = it.unit_price ?? null;
+
+      const effectiveMult = 1 - (discPct > 0 ? discPct / 100 : 0);
+      const netPrice = price != null && effectiveMult > 0 ? price * effectiveMult : price;
+
+      // Self-Healing Math Check: detect dropped zeros on dot-matrix print (e.g. 10 -> 100)
+      if (lineTotal != null && lineTotal > 0 && netPrice != null && netPrice > 0) {
+        const derivedQty = lineTotal / netPrice;
+        const rounded = Math.round(derivedQty);
+        if (Math.abs(derivedQty - rounded) < 0.05) {
+          if (qty == null || (qty > 0 && Math.abs(qty - rounded) >= 1 && (rounded % qty === 0 || qty % rounded === 0))) {
+            qty = rounded;
+          }
+        }
+      }
 
       // Auto-compute line total if not provided by OCR but qty & price exist
-      if (lineTotal == null && it.quantity != null && it.unit_price != null) {
-        const raw = Number(it.quantity) * Number(it.unit_price);
+      if (lineTotal == null && qty != null && price != null) {
+        const raw = Number(qty) * Number(price);
         lineTotal = Math.round(raw * (1 - discPct / 100) * 100) / 100;
       }
 
@@ -93,9 +109,9 @@ export function ScreenReview({
         ...it,
         id: it.id || `item-${Date.now()}-${idx}`,
         unit: it.unit || 'nos',
-        quantity: it.quantity ?? null,
+        quantity: qty,
         free_quantity: it.free_quantity ?? null,
-        unit_price: it.unit_price ?? null,
+        unit_price: price,
         discount_percent: discPct > 0 ? discPct : (it.discount_percent ?? 0),
         total: lineTotal,
       };
