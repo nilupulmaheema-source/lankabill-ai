@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Camera, BookOpen, Settings, Zap, Database, Sun, Moon, HardDrive } from 'lucide-react';
+import { Camera, BookOpen, Clock, Settings, Zap, Database, Sun, Moon, HardDrive } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'capture' | 'review' | 'ledger';
@@ -74,8 +74,8 @@ export function Header({
                 : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Ledger</span>
+            <Clock className="w-3.5 h-3.5" />
+            <span>Recents</span>
             {recordCount > 0 && (
               <span className="px-1.5 py-0.2 bg-slate-300/80 dark:bg-zinc-600 text-slate-700 dark:text-zinc-200 rounded-full text-[10px] tabular-nums font-semibold">
                 {recordCount}

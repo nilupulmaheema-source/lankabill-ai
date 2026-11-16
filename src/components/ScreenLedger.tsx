@@ -95,6 +95,24 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
     setTimeout(() => setCopiedTsv(false), 2500);
   };
 
+  const handleCopySingleInvoiceTsv = (record: InvoiceRecord) => {
+    const header = ['Item Description', 'Quantity', 'Unit', 'Unit Price (LKR)', 'Line Total (LKR)'].join('\t');
+    const rows = (record.items || []).map((it) =>
+      [it.name, it.quantity ?? '', it.unit || 'nos', it.unit_price ?? '', it.total ?? ''].join('\t')
+    );
+    const tsv = [
+      `Invoice: ${record.vendor_name} (#${record.invoice_number})`,
+      `Date: ${record.invoice_date}`,
+      `Grand Total: Rs. ${record.grand_total}`,
+      '',
+      header,
+      ...rows,
+    ].join('\n');
+    navigator.clipboard.writeText(tsv);
+    setCopiedTsv(true);
+    setTimeout(() => setCopiedTsv(false), 2000);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6 animate-in fade-in duration-200">
       {/* APPLE FITNESS / HEALTH STYLE KPI BENTO CARDS */}
@@ -449,18 +467,40 @@ export function ScreenLedger({ invoices, onRefresh, onSelectForEdit }: ScreenLed
               </div>
             )}
 
-            {/* Modal Footer */}
-            <div className="p-3 border-t border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
-                Logged at: {new Date(activeModalRecord.created_at).toLocaleString('en-LK')}
+            {/* Modal Footer with 1-Click Google Sheets Export & Edit */}
+            <div className="p-3 border-t border-black/[0.04] dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2.5">
+              <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                Logged: {new Date(activeModalRecord.created_at).toLocaleString('en-LK')}
               </span>
-              <button
-                type="button"
-                onClick={() => setActiveModalRecord(null)}
-                className="px-4 py-2 text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full transition-opacity hover:opacity-90 ios-pressable"
-              >
-                Done
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleCopySingleInvoiceTsv(activeModalRecord)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all ios-pressable"
+                >
+                  {copiedTsv ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedTsv ? 'Copied TSV!' : 'Copy for Google Sheets'}</span>
+                </button>
+                {onSelectForEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectForEdit(activeModalRecord);
+                      setActiveModalRecord(null);
+                    }}
+                    className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold rounded-full bg-slate-200/80 dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 hover:opacity-90 transition-all ios-pressable"
+                  >
+                    <span>Edit</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveModalRecord(null)}
+                  className="px-4 py-1.5 text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full transition-opacity hover:opacity-90 ios-pressable"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         </div>

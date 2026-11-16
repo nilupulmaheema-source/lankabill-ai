@@ -36,6 +36,7 @@ interface ScreenReviewProps {
   initialData: InvoiceExtraction;
   imageUrl: string;
   processingTimeMs: number;
+  recordId?: string;
   onSave: (record: InvoiceRecord) => void;
   onDiscard: () => void;
 }
@@ -44,6 +45,7 @@ export function ScreenReview({
   initialData,
   imageUrl,
   processingTimeMs,
+  recordId,
   onSave,
   onDiscard,
 }: ScreenReviewProps) {
@@ -266,7 +268,7 @@ export function ScreenReview({
   const handleConfirmSave = () => {
     setIsSaving(true);
     const newRecord: InvoiceRecord = {
-      id: `inv-${Date.now()}`,
+      id: recordId || `inv-${Date.now()}`,
       vendor_name: vendorName.trim() || 'Unknown Sri Lankan Vendor',
       invoice_number: invoiceNumber.trim() || 'N/A',
       invoice_date: invoiceDate,
@@ -470,13 +472,15 @@ export function ScreenReview({
             </div>
           </div>
 
-          {/* LANKA PRICE CREEP & INFLATION RADAR BANNER (Apple Health Insight Card Style) */}
+          {/* LANKA PRICE CREEP & INFLATION RADAR BANNER (Option 2 - Apple Health Insight Card Style) */}
           {priceAnalysis && (
             <div
               className={`p-4 sm:p-5 rounded-3xl border transition-all ios-glass ${
                 priceAnalysis.increasedCount > 0
                   ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/30 text-rose-900 dark:text-rose-200'
-                  : 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+                  : priceAnalysis.decreasedCount > 0
+                  ? 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+                  : 'bg-blue-500/5 dark:bg-blue-950/20 border-blue-500/30 text-blue-900 dark:text-blue-200'
               }`}
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -485,13 +489,17 @@ export function ScreenReview({
                     className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                       priceAnalysis.increasedCount > 0
                         ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
-                        : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                        : priceAnalysis.decreasedCount > 0
+                        ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                     }`}
                   >
                     {priceAnalysis.increasedCount > 0 ? (
                       <TrendingUp className="w-5 h-5 animate-pulse" />
+                    ) : priceAnalysis.decreasedCount > 0 ? (
+                      <TrendingDown className="w-5 h-5" />
                     ) : (
-                      <ShieldAlert className="w-5 h-5" />
+                      <ShieldAlert className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
                   <div>
@@ -501,11 +509,22 @@ export function ScreenReview({
                           ? `⚠️ Price Increase Detected (${priceAnalysis.increasedCount} Item${
                               priceAnalysis.increasedCount > 1 ? 's' : ''
                             })`
-                          : 'Price Stability Verified: Zero Markups'}
+                          : priceAnalysis.decreasedCount > 0
+                          ? `📉 Supplier Discount / Price Drop (${priceAnalysis.decreasedCount} Item${
+                              priceAnalysis.decreasedCount > 1 ? 's' : ''
+                            })`
+                          : priceAnalysis.analyzedItems.filter((i) => i.price_comparison?.status !== 'new').length > 0
+                          ? 'Price Stability Verified: Zero Markups'
+                          : 'Lanka Price Radar: Baseline Pricing Stored'}
                       </h4>
                       {priceAnalysis.increasedCount > 0 && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20 uppercase tracking-wide">
                           Supplier Markup
+                        </span>
+                      )}
+                      {priceAnalysis.decreasedCount > 0 && priceAnalysis.increasedCount === 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 uppercase tracking-wide">
+                          Saved Money
                         </span>
                       )}
                     </div>
@@ -522,8 +541,12 @@ export function ScreenReview({
                             </span>
                           )}
                         </>
-                      ) : (
+                      ) : priceAnalysis.decreasedCount > 0 ? (
+                        'Items are priced lower than previous purchases in your ledger.'
+                      ) : priceAnalysis.analyzedItems.filter((i) => i.price_comparison?.status !== 'new').length > 0 ? (
                         'All items are billed at or below previous purchase levels in your ledger.'
+                      ) : (
+                        'New delivery recorded. Stored into ledger baseline to catch future supplier price hikes automatically.'
                       )}
                     </p>
                   </div>

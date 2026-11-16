@@ -30,6 +30,7 @@ export default function Home() {
     extraction: InvoiceExtraction;
     imageUrl: string;
     processingTimeMs: number;
+    recordId?: string;
   } | null>(null);
 
   // Ledger state
@@ -153,14 +154,62 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Callback when Gemini extraction completes
-  const handleExtractionComplete = (result: {
+  // Callback when Gemini extraction completes: Auto-save immediately to database & recents!
+  const handleExtractionComplete = async (result: {
     extraction: InvoiceExtraction;
     imageUrl: string;
     processingTimeMs: number;
   }) => {
-    setReviewData(result);
+    const recordId = `inv-${Date.now()}`;
+    const calculatedSum = (result.extraction.items || []).reduce(
+      (sum, it) => sum + (Number(it.total) || 0),
+      0
+    );
+    const grandTotal = Number(result.extraction.grand_total) || calculatedSum;
+    const diff = Math.abs(grandTotal - calculatedSum);
+    const isDiscrepant = diff > 1.0;
+
+    const initialRecord: InvoiceRecord = {
+      id: recordId,
+      vendor_name: result.extraction.vendor_name?.trim() || 'Scanned Supplier Bill',
+      invoice_number: result.extraction.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+      invoice_date: result.extraction.invoice_date || new Date().toISOString().split('T')[0],
+      category: (result.extraction.category as any) || 'General',
+      items: result.extraction.items || [],
+      subtotal: result.extraction.subtotal,
+      discount: result.extraction.discount,
+      tax: result.extraction.tax,
+      grand_total: grandTotal,
+      calculated_total: Math.round(calculatedSum * 100) / 100,
+      discrepancy: Math.round(diff * 100) / 100,
+      status: isDiscrepant ? 'Flagged' : 'Approved',
+      confidence_notes: result.extraction.confidence_notes,
+      image_url: result.imageUrl,
+      created_at: new Date().toISOString(),
+      processing_time_ms: result.processingTimeMs,
+      sync_status: 'local_only',
+      audit_logs: [
+        {
+          timestamp: new Date().toISOString(),
+          action: 'AUTO_CAPTURED_AND_SAVED',
+          user: 'Phone Camera',
+          note: isDiscrepant
+            ? `Auto-saved with discrepancy diff Rs. ${diff.toFixed(2)}`
+            : 'Auto-saved to database and recents upon receipt capture',
+        },
+      ],
+    };
+
+    // Auto-save immediately to database
+    await saveInvoiceRecord(initialRecord);
+    await refreshRecords();
+
+    setReviewData({
+      ...result,
+      recordId,
+    });
     setActiveTab('review');
+    triggerToast('⚡ Bill auto-saved to Recents & Database!');
   };
 
   // Callback when review is confirmed & saved
@@ -227,6 +276,7 @@ export default function Home() {
             initialData={reviewData.extraction}
             imageUrl={reviewData.imageUrl}
             processingTimeMs={reviewData.processingTimeMs}
+            recordId={reviewData.recordId}
             onSave={handleSaveInvoice}
             onDiscard={handleDiscardReview}
           />
@@ -249,6 +299,7 @@ export default function Home() {
                 },
                 imageUrl: rec.image_url || '',
                 processingTimeMs: rec.processing_time_ms || 2000,
+                recordId: rec.id,
               });
               setActiveTab('review');
             }}
@@ -280,7 +331,7 @@ export default function Home() {
                 : 'text-slate-600 dark:text-zinc-400'
             }`}
           >
-            <span>📋 Ledger</span>
+            <span>🕒 Recents</span>
             {invoices.length > 0 && (
               <span className="px-1.5 py-0.2 bg-black/20 dark:bg-white/20 rounded-full text-[10px] tabular-nums font-bold">
                 {invoices.length}

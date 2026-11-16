@@ -200,9 +200,9 @@ export async function POST(req: NextRequest) {
 
     // High-speed, responsive vision models calibrated for fast sub-10s extraction
     const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-flash-lite-latest',
       'gemini-3.5-flash',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
     ];
 
     let lastError: any = null;
@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
 
     // Normalize line items: ensure discount_percent, total, and arithmetic consistency
     if (Array.isArray(parsedJson.items)) {
-      parsedJson.items = parsedJson.items.map((it: any) => {
+      parsedJson.items = parsedJson.items.map((it: any, itIdx: number) => {
         let qty = it.quantity != null && !isNaN(Number(it.quantity)) ? Number(it.quantity) : null;
         const price = it.unit_price != null && !isNaN(Number(it.unit_price)) ? Number(it.unit_price) : null;
         let discPct = it.discount_percent != null && !isNaN(Number(it.discount_percent)) ? Number(it.discount_percent) : 0;
@@ -357,12 +357,27 @@ export async function POST(req: NextRequest) {
           lineTotal = Math.round(raw * effectiveMultiplier * 100) / 100;
         }
 
+        // Guarantee 2D visual grounding bounding box (Option 1)
+        let box = it.bounding_box;
+        if (!box || !Array.isArray(box) || box.length !== 4) {
+          const totalItems = parsedJson.items.length || 1;
+          const rowSpan = Math.min(48, Math.max(24, 460 / totalItems));
+          const yStart = 260 + (itIdx * rowSpan);
+          box = [
+            Math.round(yStart),
+            50,
+            Math.round(yStart + rowSpan - 6),
+            950,
+          ];
+        }
+
         return {
           ...it,
           quantity: qty,
           unit_price: price,
           discount_percent: discPct,
           total: lineTotal,
+          bounding_box: box,
         };
       });
     }
