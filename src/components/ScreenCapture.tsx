@@ -55,6 +55,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
   };
 
   const processImageFile = async (file: File) => {
+    console.log('[LankaBill] Selected file:', file.name, file.type, file.size);
     const fileName = file.name?.toLowerCase() || '';
     const fileType = file.type?.toLowerCase() || '';
     const isSupported =
@@ -76,7 +77,9 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
     try {
       // 1. Client-side compression & format handling (with HEIC support)
       setLoadingStep('Optimizing photo for high-speed upload...');
+      console.log('[LankaBill] Compressing image...');
       const compResult = await compressInvoiceImage(file, 1600, 0.85);
+      console.log('[LankaBill] Compression complete:', compResult);
       setCompressionInfo(compResult);
 
       // 2. Call Gemini Vision API Route
@@ -87,6 +90,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
       const timeoutId = setTimeout(() => controller.abort(), 90000);
 
       try {
+        console.log('[LankaBill] Sending extraction request to /api/extract...');
         const response = await fetch('/api/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -100,6 +104,7 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
         clearTimeout(timeoutId);
 
         const json = await response.json();
+        console.log('[LankaBill] Extraction response received:', json);
         stopTimer();
         setIsProcessing(false);
 
@@ -117,11 +122,13 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
         clearTimeout(timeoutId);
         stopTimer();
         setIsProcessing(false);
+        console.error('[LankaBill] Fetch error:', fetchErr);
         setErrorMsg('Network timeout reaching AI server. Please check internet connection.');
       }
     } catch (compErr: any) {
       stopTimer();
       setIsProcessing(false);
+      console.error('[LankaBill] Compression error:', compErr);
       setErrorMsg(compErr.message || 'Error preparing image for scanning.');
     }
   };
@@ -250,42 +257,85 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
         </div>
       ) : (
         /* Capture Controls */
-        <div className="space-y-6">
-          {/* PRIMARY APPLE STYLE MOBILE CAPTURE CARD */}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.heic,.heif,application/pdf"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  processImageFile(e.target.files[0]);
-                }
-              }}
-            />
+        <div className="space-y-4 sm:space-y-6">
+          {/* PRIMARY APPLE STYLE MOBILE CAPTURE CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {/* 1. Direct Camera */}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    e.target.value = '';
+                    processImageFile(file);
+                  }
+                }}
+              />
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full group bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl p-6 sm:p-7 shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-4 transition-all ios-pressable border border-emerald-400/20"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
-                <Camera className="w-7 h-7 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg sm:text-xl tracking-tight">Scan Bill with Camera</span>
-                  <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
-                    Fast 4G
-                  </span>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-full group bg-emerald-600 hover:bg-emerald-500 text-white rounded-3xl p-5 sm:p-6 shadow-lg shadow-emerald-600/25 flex items-center gap-3.5 transition-all ios-pressable border border-emerald-400/20 text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                  <Camera className="w-6 h-6 text-white" />
                 </div>
-                <p className="text-xs text-emerald-100 font-normal mt-0.5">
-                  Tap to launch phone camera or pick from gallery
-                </p>
-              </div>
-            </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base sm:text-lg tracking-tight">Camera Snap</span>
+                    <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
+                      Live
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-100 font-normal mt-0.5">
+                    Launch phone camera directly
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* 2. Photo Library / Gallery */}
+            <div>
+              <input
+                ref={desktopInputRef}
+                type="file"
+                accept="image/*,.heic,.heif,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    e.target.value = '';
+                    processImageFile(file);
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => desktopInputRef.current?.click()}
+                className="w-full h-full group ios-glass hover:bg-white/80 dark:hover:bg-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm flex items-center gap-3.5 transition-all ios-pressable border border-black/[0.06] dark:border-white/[0.08] text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0 text-slate-700 dark:text-zinc-200">
+                  <Upload className="w-6 h-6 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">Photo Library</span>
+                    <span className="text-[10px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 px-2 py-0.5 rounded-full border border-black/[0.04] dark:border-white/[0.06]">
+                      HEIC / PDF
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-normal mt-0.5">
+                    Choose existing bill from phone
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* SECONDARY DRAG & DROP ZONE (Desktop & File Picker) */}
@@ -295,33 +345,15 @@ export function ScreenCapture({ onExtractionComplete }: ScreenCaptureProps) {
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => desktopInputRef.current?.click()}
-            className={`cursor-pointer ios-glass rounded-3xl p-6 text-center transition-all border ios-pressable ${
+            className={`cursor-pointer ios-glass rounded-3xl p-4 sm:p-5 text-center transition-all border ios-pressable ${
               dragActive
                 ? 'border-emerald-500 bg-emerald-500/10 scale-[1.01]'
                 : 'border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.12] dark:hover:border-white/[0.16]'
             }`}
           >
-            <input
-              ref={desktopInputRef}
-              type="file"
-              accept="image/*,.heic,.heif,application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  processImageFile(e.target.files[0]);
-                }
-              }}
-            />
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-600 dark:text-zinc-300">
-                <Upload className="w-4 h-4" />
-              </div>
-              <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                Drop invoice photo or PDF here
-              </p>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                Supports iPhone HEIC, JPEG, PNG, and PDF files
-              </p>
+            <div className="flex items-center justify-center gap-2 text-xs font-medium text-slate-600 dark:text-zinc-400">
+              <Upload className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Or drop file here (iPhone HEIC, JPEG, PNG, PDF up to 25MB)</span>
             </div>
           </div>
 
