@@ -277,40 +277,59 @@ export async function POST(req: NextRequest) {
       },
     ];
 
-    // Fast failover helper with 25s timeout per model to give vision generation full breathing room
-    const generateWithTimeout = async (model: string, timeoutMs = 25000) => {
-      let timer: NodeJS.Timeout;
-      const timeoutPromise = new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`Model ${model} response exceeded ${timeoutMs}ms limit`)),
-          timeoutMs
-        );
-      });
-      try {
-        const result = await Promise.race([
-          ai.models.generateContent({
-            model,
-            contents: requestContents,
-            config: requestConfig,
-          }),
-          timeoutPromise,
-        ]);
-        return result;
-      } finally {
-        clearTimeout(timer!);
+    // Fast failover helper with automatic retry for 503/429 spikes
+    const generateWithTimeoutAndRetry = async (model: string, timeoutMs = 28000, maxRetries = 2) => {
+      let lastErr: any = null;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        let timer: NodeJS.Timeout;
+        const timeoutPromise = new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`Model ${model} response exceeded ${timeoutMs}ms limit`)),
+            timeoutMs
+          );
+        });
+
+        try {
+          console.log(`[LankaBill API] Calling ${model} (attempt ${attempt}/${maxRetries})...`);
+          const result = await Promise.race([
+            ai.models.generateContent({
+              model,
+              contents: requestContents,
+              config: requestConfig,
+            }),
+            timeoutPromise,
+          ]);
+          return result;
+        } catch (err: any) {
+          lastErr = err;
+          const isSpike = err.status === 503 || err.status === 429 || (err.message && (err.message.includes('503') || err.message.includes('high demand') || err.message.includes('quota')));
+          console.warn(`[LankaBill API] ${model} attempt ${attempt} warning:`, err.message?.slice(0, 100));
+
+          // If it's a transient spike and we have retries left, back off and retry
+          if (isSpike && attempt < maxRetries) {
+            const backoffMs = 1200 * attempt;
+            console.log(`[LankaBill API] Transient spike on ${model}. Retrying in ${backoffMs}ms...`);
+            await new Promise((r) => setTimeout(r, backoffMs));
+          } else {
+            break;
+          }
+        } finally {
+          clearTimeout(timer!);
+        }
       }
+      throw lastErr;
     };
 
     // Attempt candidate models with zero stall: fast failover to the first responsive model
     for (const model of candidateModels) {
       try {
-        response = await generateWithTimeout(model, 25000);
+        response = await generateWithTimeoutAndRetry(model, 28000, 2);
         if (response && response.text) {
           console.log(`[LankaBill API] Successfully extracted with vision model: ${model}`);
           break;
         }
       } catch (err: any) {
-        console.warn(`[LankaBill API] Model attempt ${model} note:`, err.message || err);
+        console.warn(`[LankaBill API] Model failover note for ${model}:`, err.message || err);
         lastError = err;
       }
     }
