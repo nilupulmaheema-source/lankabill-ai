@@ -3,6 +3,9 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { InvoiceExtractionSchema } from '@/types/invoice';
 import { SAMPLE_BILLS } from '@/data/sampleBills';
 
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 // System prompt tailored for Sri Lankan retail bills & pharma distribution (Day 1 Benchmark & Calibration)
 const SRI_LANKA_BILL_SYSTEM_PROMPT = `
 You are an expert high-speed Optical Document & Invoice AI specializing in Sri Lankan retail and distribution bills.
@@ -200,9 +203,8 @@ export async function POST(req: NextRequest) {
 
     // High-speed, responsive vision models calibrated for fast sub-10s extraction
     const candidateModels = [
+      'gemini-3.8-flash',
       'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-2.5-flash',
     ];
 
     let lastError: any = null;
